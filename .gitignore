@@ -1,0 +1,63 @@
+# ==========================
+# Operating System
+# ==========================
+.DS_Store
+Thumbs.db
+
+# ==========================
+# Python
+# ==========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.python-version
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ==========================
+# Node.js
+# ==========================
+node_modules/
+dist/
+build/
+coverage/
+
+# ==========================
+# Environment
+# ==========================
+.env
+.env.*
+
+!.env.example
+
+# ==========================
+# IDE
+# ==========================
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+.idea/
+
+# ==========================
+# Logs
+# ==========================
+*.log
+
+# ==========================
+# Docker
+# ==========================
+*.pid
+
+# ==========================
+# Misc
+# ==========================
+tmp/
+temp/
+.cache/
