@@ -1,0 +1,14 @@
+[project]
+name = "aegis-api"
+version = "0.1.0"
+description = "Aegis AI SRE Platform API Service"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
