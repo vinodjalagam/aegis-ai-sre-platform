@@ -14,7 +14,7 @@ class IncidentRules:
         "name": "Node Down",
         "severity": IncidentSeverity.CRITICAL,
         "source": IncidentSource.PROMETHEUS,
-        "query": 'up{job="kubelet"} == 0',
+        "query": 'up{job="kubelet",metrics_path="/metrics"} == 0',
         "description": "One or more Kubernetes nodes are unreachable.",
     }
 
@@ -24,6 +24,14 @@ class IncidentRules:
         "source": IncidentSource.PROMETHEUS,
         "query": 'kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff"} > 0',
         "description": "Pod is in CrashLoopBackOff.",
+    }
+
+    POD_OOMKILLED = {
+        "name": "OOMKilled",
+        "severity": IncidentSeverity.CRITICAL,
+        "source": IncidentSource.PROMETHEUS,
+        "query": 'kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} > 0',
+        "description": "Pod container was terminated because it exceeded its memory limit.",
     }
 
     HIGH_CPU = {
@@ -52,6 +60,7 @@ class IncidentRules:
     ALL_RULES = [
         NODE_DOWN,
         POD_CRASHLOOP,
+        POD_OOMKILLED,
         HIGH_CPU,
         HIGH_MEMORY,
     ]

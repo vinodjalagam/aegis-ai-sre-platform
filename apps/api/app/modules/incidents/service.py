@@ -9,6 +9,12 @@ from app.modules.incidents.schemas import (
     IncidentCreate,
     IncidentUpdate,
 )
+from app.modules.incidents.timeline.service import (
+    IncidentTimelineService,
+)
+from app.modules.incidents.timeline.schemas import (
+    IncidentTimelineEventCreate,
+)
 
 
 class IncidentService:
@@ -18,6 +24,7 @@ class IncidentService:
 
     def __init__(self, db: AsyncSession):
         self.repository = IncidentRepository(db)
+        self.timeline_service = IncidentTimelineService(db)
 
     async def create_incident(self, incident: IncidentCreate):
         return await self.repository.create(incident)
@@ -52,11 +59,69 @@ class IncidentService:
     async def resolve_incident(
         self,
         incident,
-        ):
+    ):
         """
         Resolve an incident.
         """
 
-        return await self.repository.resolve(
+        resolved = await self.repository.resolve(
             incident
         )
+
+        await self.timeline_service.create(
+            incident_id=incident.id,
+            data=IncidentTimelineEventCreate(
+                event_type="resolved",
+                title="Incident resolved",
+                description="Incident manually resolved",
+            ),
+        )
+
+        return resolved
+        
+    async def acknowledge_incident(
+        self,
+        incident,
+    ):
+        """
+        Acknowledge an incident.
+        """
+
+        acknowledged = await self.repository.acknowledge(
+            incident
+        )
+
+        await self.timeline_service.create(
+            incident_id=incident.id,
+            data=IncidentTimelineEventCreate(
+                event_type="acknowledged",
+                title="Incident acknowledged",
+                description="Incident acknowledged by user",
+            ),
+        )
+
+        return acknowledged
+    
+    async def auto_resolve_incident(
+        self,
+        incident,
+    ):
+        """
+        Automatically resolve an incident when
+        the Prometheus rule is no longer triggered.
+        """
+
+        resolved = await self.repository.resolve(
+            incident
+        )
+
+        await self.timeline_service.create(
+            incident_id=incident.id,
+            data=IncidentTimelineEventCreate(
+                event_type="resolved",
+                title="Incident resolved",
+                description="Incident automatically resolved because the rule is no longer triggered",
+            ),
+        )
+
+        return resolved

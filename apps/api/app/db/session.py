@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import (
 
 from app.db.engine import engine
 
+
 SessionLocal = async_sessionmaker(
     bind=engine,
     class_=AsyncSession,

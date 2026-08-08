@@ -11,8 +11,22 @@ from app.modules.incidents.rules import IncidentRules
 from app.modules.incidents.repository import IncidentRepository
 from app.modules.incidents.service import IncidentService
 from app.modules.incidents.schemas import IncidentCreate
+from app.modules.incidents.evidence.service import (
+    IncidentEvidenceService,
+)
+from app.modules.incidents.evidence.schemas import (
+    IncidentEvidenceCreate,
+)
+
+from app.modules.incidents.timeline.service import (
+    IncidentTimelineService,
+)
+from app.modules.incidents.timeline.schemas import (
+    IncidentTimelineEventCreate,
+)
 
 logger = logging.getLogger(__name__)
+
 
 class IncidentDetector:
     """
@@ -30,6 +44,8 @@ class IncidentDetector:
         self.prometheus = PrometheusClient()
         self.repository = IncidentRepository(db)
         self.service = IncidentService(db)
+        self.evidence_service = IncidentEvidenceService(db)
+        self.timeline_service = IncidentTimelineService(db)
 
     async def scan(self):
         """
@@ -40,16 +56,25 @@ class IncidentDetector:
 
         for rule in IncidentRules.ALL_RULES:
 
-            logger.info("Executing rule: %s", rule["name"])
+            logger.info(
+                "Executing rule: %s",
+                rule["name"],
+            )
 
             try:
-                result = await self.prometheus.query(rule["query"])
+                result = await self.prometheus.query(
+                    rule["query"]
+                )
 
                 logger.info(
                     "Rule '%s' returned %d result(s)",
                     rule["name"],
                     len(result),
                 )
+
+                # -------------------------------------------------
+                # No metrics matched
+                # -------------------------------------------------
 
                 if not result:
 
@@ -71,7 +96,21 @@ class IncidentDetector:
                             incident.id,
                         )
 
-                        await self.service.resolve_incident(
+                        # await self.service.resolve_incident(
+                        #     incident
+                        # )
+
+                        # await self.timeline_service.create(
+                        #     incident_id=incident.id,
+                        #     data=IncidentTimelineEventCreate(
+                        #         event_type="resolved",
+                        #         title="Incident resolved",
+                        #         description=(
+                        #             f"{rule['name']} is no longer triggered"
+                        #         ),
+                        #     ),
+                        # )
+                        await self.service.auto_resolve_incident(
                             incident
                         )
 
@@ -82,9 +121,16 @@ class IncidentDetector:
 
                     continue
 
+                # -------------------------------------------------
+                # Rule triggered
+                # -------------------------------------------------
+
                 for item in result:
 
-                    metric = item.get("metric", {})
+                    metric = item.get(
+                        "metric",
+                        {},
+                    )
 
                     resource_name = (
                         metric.get("instance")
@@ -94,34 +140,88 @@ class IncidentDetector:
                         or "unknown"
                     )
 
-                    namespace = metric.get("namespace")
+                    namespace = metric.get(
+                        "namespace"
+                    )
+
+                    # Prometheus returns the actual value
+                    # in item["value"][1].
+                    value = None
+
+                    if item.get("value"):
+                        value = str(
+                            item["value"][1]
+                        )
 
                     logger.info(
                         "Resource: %s",
                         resource_name,
                     )
 
-                    existing = await self.repository.get_open_incident(
-                        title=rule["name"],
-                        resource_name=resource_name,
+                    logger.info(
+                        "Metric value: %s",
+                        value,
+                    )
+
+                    # -------------------------------------------------
+                    # Check whether incident already exists
+                    # -------------------------------------------------
+
+                    existing = (
+                        await self.repository.get_open_incident(
+                            title=rule["name"],
+                            resource_name=resource_name,
+                        )
                     )
 
                     if existing:
+
                         logger.info(
                             "Incident already exists: %s (%s)",
                             rule["name"],
                             resource_name,
                         )
+
+                        # -------------------------------------------------
+                        # Add fresh evidence to existing incident
+                        # -------------------------------------------------
+
+                        evidence = (
+                            IncidentEvidenceCreate(
+                                evidence_type="prometheus",
+                                title=rule["name"],
+                                description=rule[
+                                    "description"
+                                ],
+                                query=rule["query"],
+                                resource_name=resource_name,
+                                namespace=namespace,
+                                metric_value=value,
+                            )
+                        )
+
+
+                        created_evidence = await self.evidence_service.create(
+                            incident_id=existing.id,
+                            data=evidence,
+                        )
+                       
+  
+                        logger.info(
+                            "Evidence added to existing "
+                            "incident: %s",
+                            existing.id,
+                        )
+
                         continue
+
+                    # -------------------------------------------------
+                    # Create new incident
+                    # -------------------------------------------------
 
                     logger.warning(
                         "Rule triggered: %s (%s)",
                         rule["name"],
-                        resource_name,
-                    )
-
-                    logger.info(
-                        "Creating incident for %s",
                         resource_name,
                     )
 
@@ -135,13 +235,64 @@ class IncidentDetector:
                         namespace=namespace,
                     )
 
-                    created = await self.service.create_incident(
-                        incident
+                    created = (
+                        await self.service.create_incident(
+                            incident
+                        )
+                    )
+                    await self.timeline_service.create(
+                        incident_id=created.id,
+                        data=IncidentTimelineEventCreate(
+                            event_type="detected",
+                            title="Incident detected",
+                            description=(
+                                f"{rule['name']} detected on "
+                                f"{resource_name}"
+                            ),
+                        ),
                     )
 
                     logger.info(
                         "Incident created successfully: %s",
                         created.id,
+                    )
+
+                    # -------------------------------------------------
+                    # Create evidence for new incident
+                    # -------------------------------------------------
+
+                    evidence = IncidentEvidenceCreate(
+                        evidence_type="prometheus",
+                        title=rule["name"],
+                        description=rule["description"],
+                        query=rule["query"],
+                        resource_name=resource_name,
+                        namespace=namespace,
+                        metric_value=value,
+                    )
+
+                    created_evidence = (
+                        await self.evidence_service.create(
+                            incident_id=created.id,
+                            data=evidence,
+                        )
+                    )
+                    await self.timeline_service.create(
+                        incident_id=created.id,
+                        data=IncidentTimelineEventCreate(
+                            event_type="evidence_collected",
+                            title="Evidence collected",
+                            description=(
+                                f"Prometheus evidence collected for "
+                                f"{resource_name}"
+                            ),
+                            metadata_json=None,
+                        ),
+                    )
+
+                    logger.info(
+                        "Evidence created successfully: %s",
+                        created_evidence.id,
                     )
 
             except Exception:
@@ -150,4 +301,6 @@ class IncidentDetector:
                     rule["name"],
                 )
 
-        logger.info("Incident scan completed.")
+        logger.info(
+            "Incident scan completed."
+        )

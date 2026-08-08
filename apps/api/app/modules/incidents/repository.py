@@ -1,9 +1,13 @@
+"""
+Incident repository.
+"""
+from __future__ import annotations
+
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.incidents.models import Incident
-
 from app.modules.incidents.enums import IncidentStatus
+from app.modules.incidents.models import Incident
 from app.modules.incidents.schemas import (
     IncidentCreate,
     IncidentUpdate,
@@ -11,6 +15,9 @@ from app.modules.incidents.schemas import (
 
 
 class IncidentRepository:
+    """
+    Database operations for incidents.
+    """
 
     def __init__(
         self,
@@ -22,6 +29,9 @@ class IncidentRepository:
         self,
         incident: IncidentCreate,
     ) -> Incident:
+        """
+        Create a new incident.
+        """
 
         db_incident = Incident(
             **incident.model_dump()
@@ -38,6 +48,9 @@ class IncidentRepository:
         self,
         incident_id: str,
     ) -> Incident | None:
+        """
+        Get an incident by ID.
+        """
 
         result = await self.db.execute(
             select(Incident).where(
@@ -50,6 +63,9 @@ class IncidentRepository:
     async def list(
         self,
     ) -> tuple[list[Incident], int]:
+        """
+        Return all incidents and total count.
+        """
 
         result = await self.db.execute(
             select(Incident).order_by(
@@ -72,6 +88,9 @@ class IncidentRepository:
         incident: Incident,
         data: IncidentUpdate,
     ) -> Incident:
+        """
+        Update an existing incident.
+        """
 
         values = data.model_dump(
             exclude_unset=True
@@ -93,6 +112,9 @@ class IncidentRepository:
         self,
         incident: Incident,
     ) -> None:
+        """
+        Delete an incident.
+        """
 
         await self.db.delete(incident)
         await self.db.commit()
@@ -103,50 +125,79 @@ class IncidentRepository:
         resource_name: str,
     ) -> Incident | None:
         """
-        Check whether an active OPEN incident
-        already exists for the same resource.
+        Return an active OPEN incident for the
+        same rule and resource.
         """
 
         result = await self.db.execute(
             select(Incident).where(
                 Incident.title == title,
                 Incident.resource_name == resource_name,
-                Incident.status == "open",
+                Incident.status.in_(
+                    [
+                        IncidentStatus.OPEN,
+                        IncidentStatus.ACKNOWLEDGED,
+                    ]
+                ),
                 Incident.is_active.is_(True),
             )
         )
 
         return result.scalar_one_or_none()
+
     async def get_open_incidents(
         self,
         title: str,
-    ) :
+    ) -> list[Incident]:
         """
-        Return all open incidents for a rule.
+        Return all active OPEN incidents for a rule.
         """
 
         result = await self.db.execute(
             select(Incident).where(
                 Incident.title == title,
-                Incident.status == IncidentStatus.OPEN,
+                Incident.status.in_(
+                    [
+                        IncidentStatus.OPEN,
+                        IncidentStatus.ACKNOWLEDGED,
+                    ]
+                ),
                 Incident.is_active.is_(True),
             )
         )
 
-        return list(result.scalars().all())
-    
+        return list(
+            result.scalars().all()
+        )
+
     async def resolve(
         self,
         incident: Incident,
-        ):
+    ) -> Incident:
         """
-        Mark incident as resolved.
+        Mark an incident as resolved and inactive.
         """
 
         incident.status = IncidentStatus.RESOLVED
+        incident.is_active = False
 
         await self.db.commit()
+        await self.db.refresh(incident)
 
+        return incident
+    
+    
+    async def acknowledge(
+        self,
+        incident: Incident,
+    ) -> Incident:
+        """
+        Mark an incident as acknowledged.
+        """
+
+        incident.status = IncidentStatus.ACKNOWLEDGED
+
+        await self.db.commit()
         await self.db.refresh(incident)
 
         return incident

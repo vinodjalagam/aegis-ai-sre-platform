@@ -9,6 +9,7 @@ class IncidentSeverity(str, Enum):
 
 class IncidentStatus(str, Enum):
     OPEN = "open"
+    ACKNOWLEDGED = "acknowledged"
     RESOLVED = "resolved"
 
 
