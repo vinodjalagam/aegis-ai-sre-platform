@@ -16,7 +16,11 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    app_name: str = Field(default="Aegis API")
+    # ------------------------------------------------------------------
+    # Application
+    # ------------------------------------------------------------------
+
+    app_name: str = Field(default="aegis-api")
     app_version: str = Field(default="0.1.0")
     app_env: str = Field(default="development")
     debug: bool = Field(default=True)
@@ -25,6 +29,44 @@ class Settings(BaseSettings):
     port: int = Field(default=8000)
 
     api_v1_prefix: str = Field(default="/api/v1")
+
+    # ------------------------------------------------------------------
+    # Database
+    # ------------------------------------------------------------------
+
+    database_host: str = Field(default="localhost")
+    database_port: int = Field(default=5432)
+    database_name: str = Field(default="aegis")
+    database_user: str = Field(default="postgres")
+    database_password: str = Field(default="postgres")
+    
+    # ------------------------------------------------------------------
+    # Security
+    # ------------------------------------------------------------------
+
+    secret_key: str = Field(
+        default="change-this-in-production"
+    )
+
+    algorithm: str = Field(
+        default="HS256"
+    )
+
+    access_token_expire_minutes: int = Field(
+        default=30
+    )
+
+    @property
+    def database_url(self) -> str:
+        """
+        SQLAlchemy async database URL.
+        """
+        return (
+            f"postgresql+asyncpg://"
+            f"{self.database_user}:{self.database_password}"
+            f"@{self.database_host}:{self.database_port}"
+            f"/{self.database_name}"
+        )
 
 
 @lru_cache

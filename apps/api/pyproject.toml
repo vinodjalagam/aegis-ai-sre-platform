@@ -5,9 +5,19 @@ description = "Enterprise AI SRE Platform API"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "alembic>=1.19.0",
+    "argon2-cffi>=25.1.0",
+    "asyncpg>=0.31.0",
+    "email-validator>=2.3.0",
     "fastapi>=0.141.1",
+    "kubernetes>=36.0.3",
+    "pwdlib>=0.3.0",
     "pydantic-settings>=2.15.0",
     "python-dotenv>=1.2.2",
+    "python-jose[cryptography]>=3.5.0",
+    "python-ulid>=4.0.1",
+    "requests>=2.34.2",
+    "sqlalchemy>=2.0.51",
     "uvicorn[standard]>=0.52.1",
 ]
 

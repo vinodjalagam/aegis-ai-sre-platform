@@ -1,0 +1,13 @@
+"""
+ID-related constants for the Aegis platform.
+"""
+
+REQUEST_PREFIX = "REQ"
+CORRELATION_PREFIX = "CORR"
+INCIDENT_PREFIX = "INC"
+ALERT_PREFIX = "ALERT"
+USER_PREFIX = "USER"
+AGENT_PREFIX = "AGENT"
+JOB_PREFIX = "JOB"
+
+ID_SEPARATOR = "-"
