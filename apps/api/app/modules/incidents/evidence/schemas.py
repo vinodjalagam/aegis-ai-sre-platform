@@ -11,6 +11,7 @@ class IncidentEvidenceCreate(BaseModel):
     resource_name: str | None = None
     namespace: str | None = None
     metric_value: str | None = None
+    metadata_json: dict | None = None
 
 
 class IncidentEvidenceResponse(BaseModel):
@@ -25,4 +26,5 @@ class IncidentEvidenceResponse(BaseModel):
     resource_name: str | None
     namespace: str | None
     metric_value: str | None
+    metadata_json: dict | None
     created_at: datetime

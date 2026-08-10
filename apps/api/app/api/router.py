@@ -16,6 +16,7 @@ from app.modules.incidents.timeline.api import (
     router as incident_timeline_router,
 )
 from app.modules.rca.api import router as rca_router
+from app.modules.incidents.comments.api import router as incident_comments_router
 api_router = APIRouter(prefix=settings.api_v1_prefix)
 
 api_router.include_router(health_router)
@@ -29,3 +30,4 @@ api_router.include_router(incidents_router)
 api_router.include_router(incident_evidence_router)
 api_router.include_router(incident_timeline_router)
 api_router.include_router(rca_router)
+api_router.include_router(incident_comments_router)

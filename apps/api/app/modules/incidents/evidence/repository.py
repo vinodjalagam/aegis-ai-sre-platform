@@ -56,6 +56,30 @@ class IncidentEvidenceRepository:
         return list(
             result.scalars().all()
         )
+    async def exists(
+        self,
+        incident_id: str,
+        evidence_type: str,
+        title: str,
+        resource_name: str | None = None,
+    ) -> bool:
+        """
+        Check whether equivalent evidence already exists
+        for an incident.
+        """
+
+        result = await self.db.execute(
+            select(IncidentEvidence.id)
+            .where(
+                IncidentEvidence.incident_id == incident_id,
+                IncidentEvidence.evidence_type == evidence_type,
+                IncidentEvidence.title == title,
+                IncidentEvidence.resource_name == resource_name,
+            )
+            .limit(1)
+        )
+
+        return result.scalar_one_or_none() is not None
 
     async def delete(
         self,

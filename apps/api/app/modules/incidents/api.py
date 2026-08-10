@@ -10,9 +10,13 @@ from app.db.session import get_db
 from app.modules.incidents.schemas import (
     IncidentCreate,
     IncidentUpdate,
+    IncidentAssignment,
 )
+
 from app.modules.incidents.service import IncidentService
 from app.modules.incidents.enums import IncidentStatus
+from app.core.security.dependencies import get_current_user_id
+
 router = APIRouter(
     prefix="/incidents",
     tags=["Incidents"],
@@ -169,6 +173,51 @@ async def resolve_incident(
         "data": resolved,
     }
 
+@router.patch("/{incident_id}/assignment")
+async def assign_incident(
+    incident_id: str,
+    data: IncidentAssignment,
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Assign or unassign an incident.
+    """
+
+    service = IncidentService(db)
+
+    incident = await service.get_incident(
+        incident_id
+    )
+
+    if incident is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Incident not found",
+        )
+
+    if not incident.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Resolved incident cannot be assigned",
+        )
+
+    try:
+        assigned = await service.assign_incident(
+            incident,
+            data.user_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    return {
+        "success": True,
+        "data": assigned,
+    }
+    
 @router.patch("/{incident_id}")
 async def update_incident(
     incident_id: str,

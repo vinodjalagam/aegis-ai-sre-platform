@@ -55,3 +55,12 @@ class Incident(BaseModel):
         default=True,
         nullable=False,
     )
+    
+    assigned_to: Mapped[str | None] = mapped_column(
+        ForeignKey(
+            "users.id",
+            ondelete="SET NULL",
+        ),
+        nullable=True,
+        index=True,
+    )

@@ -55,6 +55,12 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = Field(
         default=30
     )
+    # ------------------------------------------------------------------
+    # AI
+    # ------------------------------------------------------------------
+
+    gemini_api_key: str | None = Field(default=None)
+    gemini_model: str = Field(default="gemini-2.5-flash")
 
     @property
     def database_url(self) -> str:
@@ -67,7 +73,7 @@ class Settings(BaseSettings):
             f"@{self.database_host}:{self.database_port}"
             f"/{self.database_name}"
         )
-
+        
 
 @lru_cache
 def get_settings() -> Settings:

@@ -24,7 +24,7 @@ from app.modules.incidents.timeline.service import (
 from app.modules.incidents.timeline.schemas import (
     IncidentTimelineEventCreate,
 )
-
+from app.modules.kubernetes.service import KubernetesService
 logger = logging.getLogger(__name__)
 
 
@@ -46,7 +46,7 @@ class IncidentDetector:
         self.service = IncidentService(db)
         self.evidence_service = IncidentEvidenceService(db)
         self.timeline_service = IncidentTimelineService(db)
-
+        self.kubernetes_service = KubernetesService()
     async def scan(self):
         """
         Execute all configured detection rules.
@@ -132,17 +132,78 @@ class IncidentDetector:
                         {},
                     )
 
-                    resource_name = (
-                        metric.get("instance")
-                        or metric.get("pod")
-                        or metric.get("node")
-                        or metric.get("service")
-                        or "unknown"
-                    )
+                    if metric.get("pod"):
+                        resource_name = metric["pod"]
+                    elif metric.get("node"):
+                        resource_name = metric["node"]
+                    elif metric.get("instance"):
+                        resource_name = metric["instance"]
+                    elif metric.get("service"):
+                        resource_name = metric["service"]
+                    else:
+                        resource_name = "unknown"
 
                     namespace = metric.get(
                         "namespace"
                     )
+                    kubernetes_metadata = None
+
+                    if namespace and resource_name:
+                        try:
+                            pod = self.kubernetes_service.find_pod_by_resource(
+                                namespace,
+                                resource_name,
+                            )
+
+                            if pod:
+                                pod_details = (
+                                    self.kubernetes_service.get_pod_details(
+                                        namespace,
+                                        pod["name"],
+                                    )
+                                )
+
+                                kubernetes_metadata = {
+                                    "pod": pod["name"],
+                                    "container": pod.get("container"),
+                                }
+
+                                if pod_details:
+                                    kubernetes_metadata.update(
+                                        {
+                                            "node": pod_details.get("node"),
+                                            "pod_ip": pod_details.get("pod_ip"),
+                                            "phase": pod_details.get("phase"),
+                                            "restart_policy": pod_details.get("restart_policy"),
+                                            "containers": pod_details.get("containers", []),
+                                        }
+                                    )
+
+                                    kubernetes_metadata["events"] = (
+                                        self.kubernetes_service.get_pod_events(
+                                            namespace,
+                                            pod["name"],
+                                        )
+                                    )
+
+                                    container_name = pod.get("container")
+
+                                    if container_name:
+                                        kubernetes_metadata["logs"] = (
+                                            self.kubernetes_service.get_pod_logs(
+                                                namespace,
+                                                pod["name"],
+                                                container_name=container_name,
+                                                previous=True,
+                                            )
+                                        )
+
+                        except Exception:
+                            logger.exception(
+                                "Failed to collect Kubernetes metadata "
+                                "for resource: %s",
+                                resource_name,
+                            )
 
                     # Prometheus returns the actual value
                     # in item["value"][1].
@@ -190,13 +251,12 @@ class IncidentDetector:
                             IncidentEvidenceCreate(
                                 evidence_type="prometheus",
                                 title=rule["name"],
-                                description=rule[
-                                    "description"
-                                ],
+                                description=rule["description"],
                                 query=rule["query"],
                                 resource_name=resource_name,
                                 namespace=namespace,
                                 metric_value=value,
+                                metadata_json=kubernetes_metadata,
                             )
                         )
 
@@ -205,13 +265,17 @@ class IncidentDetector:
                             incident_id=existing.id,
                             data=evidence,
                         )
-                       
-  
-                        logger.info(
-                            "Evidence added to existing "
-                            "incident: %s",
-                            existing.id,
-                        )
+
+                        if created_evidence:
+                            logger.info(
+                                "Evidence added to existing incident: %s",
+                                existing.id,
+                            )
+                        else:
+                            logger.debug(
+                                "Duplicate evidence skipped for incident: %s",
+                                existing.id,
+                            )
 
                         continue
 
@@ -269,6 +333,7 @@ class IncidentDetector:
                         resource_name=resource_name,
                         namespace=namespace,
                         metric_value=value,
+                        metadata_json=kubernetes_metadata,
                     )
 
                     created_evidence = (

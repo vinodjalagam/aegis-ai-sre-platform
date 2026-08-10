@@ -15,7 +15,7 @@ from app.modules.incidents.timeline.service import (
 from app.modules.incidents.timeline.schemas import (
     IncidentTimelineEventCreate,
 )
-
+from app.modules.users.repository import UserRepository
 
 class IncidentService:
     """
@@ -25,7 +25,8 @@ class IncidentService:
     def __init__(self, db: AsyncSession):
         self.repository = IncidentRepository(db)
         self.timeline_service = IncidentTimelineService(db)
-
+        self.user_repository = UserRepository(db)
+        
     async def create_incident(self, incident: IncidentCreate):
         return await self.repository.create(incident)
 
@@ -125,3 +126,50 @@ class IncidentService:
         )
 
         return resolved
+    
+    async def assign_incident(
+        self,
+        incident,
+        user_id: str | None,
+    ):
+        """
+        Assign or unassign an incident.
+        """
+
+        previous_user_id = incident.assigned_to
+
+        if user_id is not None:
+            user = await self.user_repository.get_by_id(user_id)
+
+            if user is None:
+                raise ValueError("User not found")
+
+            if not user.is_active:
+                raise ValueError("User is inactive")
+
+        assigned = await self.repository.assign(
+            incident,
+            user_id,
+        )
+
+        if user_id is not None:
+            event_type = "assigned"
+            title = "Incident assigned"
+            description = (
+                f"Incident assigned to user {user_id}"
+            )
+        else:
+            event_type = "unassigned"
+            title = "Incident unassigned"
+            description = "Incident assignment removed"
+
+        await self.timeline_service.create(
+            incident_id=incident.id,
+            data=IncidentTimelineEventCreate(
+                event_type=event_type,
+                title=title,
+                description=description,
+            ),
+        )
+
+        return assigned

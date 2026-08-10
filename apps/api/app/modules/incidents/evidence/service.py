@@ -28,10 +28,21 @@ class IncidentEvidenceService:
         self,
         incident_id: str,
         data: IncidentEvidenceCreate,
-    ) -> IncidentEvidence:
+    ) -> IncidentEvidence | None:
         """
-        Create evidence for an incident.
+        Create evidence for an incident if equivalent evidence
+        does not already exist.
         """
+
+        existing = await self.repository.exists(
+            incident_id=incident_id,
+            evidence_type=data.evidence_type,
+            title=data.title,
+            resource_name=data.resource_name,
+        )
+
+        if existing:
+            return None
 
         evidence = IncidentEvidence(
             incident_id=incident_id,

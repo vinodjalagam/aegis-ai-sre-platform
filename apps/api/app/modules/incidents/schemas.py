@@ -26,7 +26,9 @@ class IncidentUpdate(BaseModel):
     namespace: str | None = None
     is_active: bool | None = None
 
-
+class IncidentAssignment(BaseModel):
+    user_id: str | None = None
+    
 class IncidentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -40,8 +42,11 @@ class IncidentResponse(BaseModel):
     namespace: str | None
     cluster_id: str
     is_active: bool
-
+    assigned_to: str | None
 
 class IncidentListResponse(BaseModel):
     items: list[IncidentResponse]
     total: int
+    
+
+    

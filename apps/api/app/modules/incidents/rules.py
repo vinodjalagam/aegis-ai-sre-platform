@@ -30,7 +30,7 @@ class IncidentRules:
         "name": "OOMKilled",
         "severity": IncidentSeverity.CRITICAL,
         "source": IncidentSource.PROMETHEUS,
-        "query": 'kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} > 0',
+        "query": 'kube_pod_container_status_terminated_reason{reason="OOMKilled"} > 0',
         "description": "Pod container was terminated because it exceeded its memory limit.",
     }
 

@@ -14,7 +14,7 @@ from app.modules.rca.schemas import (
     RCAAnalysisResponse,
     RCARecommendation,
 )
-
+from app.modules.kubernetes.service import KubernetesService
 
 class RCAService:
     """
@@ -27,6 +27,7 @@ class RCAService:
     ):
         self.repository = RCARepository(db)
         self.evidence_repository = IncidentEvidenceRepository(db)
+        self.kubernetes_service = KubernetesService()
 
     async def create(
         self,
@@ -55,7 +56,99 @@ class RCAService:
         return await self.repository.get_by_incident(
             incident_id
         )
+    def _collect_kubernetes_context(
+        self,
+        namespace: str | None,
+        resource_name: str | None,
+    ) -> dict:
+        """
+        Collect Kubernetes context for the affected resource.
+        """
 
+        if not namespace or not resource_name:
+            return {}
+
+        # -------------------------------------------------
+        # Pod lookup
+        # -------------------------------------------------
+
+        try:
+            pod = self.kubernetes_service.find_pod_by_resource(
+                namespace,
+                resource_name,
+            )
+        except Exception:
+            pod = None
+
+        if pod:
+            pod_name = pod["name"]
+            container_name = pod.get("container")
+
+            # Pod details are the most important RCA evidence.
+            try:
+                details = self.kubernetes_service.get_pod_details(
+                    namespace,
+                    pod_name,
+                )
+            except Exception:
+                details = None
+
+            # Events are supplementary evidence.
+            try:
+                events = self.kubernetes_service.get_pod_events(
+                    namespace,
+                    pod_name,
+                )
+            except Exception:
+                events = []
+
+            # Logs are supplementary evidence.
+            try:
+                logs = self.kubernetes_service.get_pod_logs(
+                    namespace,
+                    pod_name,
+                    container_name,
+                    previous=True,
+                )
+            except Exception:
+                logs = ""
+
+            return {
+                "resource_type": "pod",
+                "pod": pod,
+                "details": details,
+                "events": events,
+                "logs": logs,
+            }
+
+        # -------------------------------------------------
+        # Node lookup
+        # -------------------------------------------------
+
+        try:
+            node_name = self.kubernetes_service.find_node_by_resource(
+                resource_name,
+            )
+        except Exception:
+            node_name = None
+
+        if node_name:
+            try:
+                node_details = (
+                    self.kubernetes_service.get_node_details(
+                        node_name
+                    )
+                )
+            except Exception:
+                node_details = None
+
+            return {
+                "resource_type": "node",
+                "node": node_name,
+                "details": node_details,
+            }
+
+        return {}
     async def analyze_incident(
         self,
         incident_id: str,
@@ -100,17 +193,65 @@ class RCAService:
         ).lower()
 
         latest = evidence[-1]
-
         resource_name = (
             latest.resource_name
             or "the affected resource"
         )
 
+        namespace = latest.namespace
+
+        kubernetes_context = self._collect_kubernetes_context(
+            namespace,
+            latest.resource_name,
+        )
+                # -------------------------------------------------
+        # Kubernetes evidence
+        # -------------------------------------------------
+
+        kubernetes_oom = False
+
+        if kubernetes_context:
+            details = kubernetes_context.get("details") or {}
+
+            evidence_text += " " + str(details).lower()
+
+            events = kubernetes_context.get("events") or []
+
+            for event in events:
+                evidence_text += " " + str(
+                    event.get("reason") or ""
+                ).lower()
+
+                evidence_text += " " + str(
+                    event.get("message") or ""
+                ).lower()
+
+            logs = kubernetes_context.get("logs") or ""
+
+            evidence_text += " " + logs.lower()
+
+            # -------------------------------------------------
+            # Detect Kubernetes OOMKilled from structured state
+            # -------------------------------------------------
+
+            for container in details.get("containers", []):
+                state = container.get("state") or {}
+
+                last_terminated = (
+                    container.get("last_terminated") or {}
+                )
+
+                if (
+                    state.get("reason") == "OOMKilled"
+                    or last_terminated.get("reason") == "OOMKilled"
+                ):
+                    kubernetes_oom = True
+                    break
         # -------------------------------------------------
         # CPU
         # -------------------------------------------------
 
-        if any(
+        if not kubernetes_oom and any(
             keyword in evidence_text
             for keyword in [
                 "cpu",
@@ -165,7 +306,7 @@ class RCAService:
         # Memory / OOM
         # -------------------------------------------------
 
-        elif any(
+        elif kubernetes_oom or any(
             keyword in evidence_text
             for keyword in [
                 "memory",
@@ -176,49 +317,195 @@ class RCAService:
                 "memory usage",
             ]
         ):
-            root_cause = (
-                f"High memory utilization or memory pressure "
-                f"on {resource_name}"
+            details = (
+                kubernetes_context.get("details")
+                if kubernetes_context
+                else None
             )
 
-            summary = (
-                "Monitoring detected excessive memory usage "
-                "or an out-of-memory condition."
+            containers = (
+                details.get("containers", [])
+                if details
+                else []
             )
 
-            confidence = 0.93
+            oom_container = None
 
-            recommendations = [
-                RCARecommendation(
-                    action=(
-                        "Identify the processes or containers "
-                        "consuming excessive memory"
+            for container in containers:
+                state = container.get("state") or {}
+
+                if (
+                    state.get("reason") == "OOMKilled"
+                    or (
+                        container.get("last_terminated") or {}
+                    ).get("reason") == "OOMKilled"
+                ):
+                    oom_container = container
+                    break
+
+            if oom_container:
+                container_name = oom_container.get(
+                    "name",
+                    "unknown",
+                )
+
+                limits = oom_container.get(
+                    "limits",
+                    {},
+                )
+
+                requests = oom_container.get(
+                    "requests",
+                    {},
+                )
+
+                state = oom_container.get(
+                    "state",
+                    {},
+                )
+
+                terminated = (
+                    state.get("terminated") or {}
+                )
+
+                exit_code = terminated.get(
+                    "exit_code"
+                )
+
+                node_name = (
+                    details.get("node")
+                    if details
+                    else None
+                )
+
+                memory_limit = limits.get(
+                    "memory"
+                )
+
+                memory_request = requests.get(
+                    "memory"
+                )
+
+                root_cause = (
+                    f"Container '{container_name}' in pod "
+                    f"'{details.get('name', resource_name)}' "
+                    f"was OOMKilled after exceeding its "
+                    f"memory limit"
+                )
+
+                summary_parts = [
+                    (
+                        f"Kubernetes terminated container "
+                        f"'{container_name}' because it exceeded "
+                        f"its configured memory limit."
+                    )
+                ]
+
+                if memory_limit:
+                    summary_parts.append(
+                        f"Memory limit: {memory_limit}."
+                    )
+
+                if memory_request:
+                    summary_parts.append(
+                        f"Memory request: {memory_request}."
+                    )
+
+                if exit_code is not None:
+                    summary_parts.append(
+                        f"Exit code: {exit_code}."
+                    )
+
+                if node_name:
+                    summary_parts.append(
+                        f"Node: {node_name}."
+                    )
+
+                summary = " ".join(summary_parts)
+
+                confidence = 0.99
+
+                recommendations = [
+                    RCARecommendation(
+                        action=(
+                            f"Review memory usage of container "
+                            f"'{container_name}'"
+                        ),
+                        reason=(
+                            "The container was terminated by "
+                            "Kubernetes because it exceeded "
+                            "its memory limit."
+                        ),
                     ),
-                    reason=(
-                        "Determine the workload responsible "
-                        "for the memory pressure"
+                    RCARecommendation(
+                        action=(
+                            "Increase the container memory limit "
+                            "if the workload legitimately requires "
+                            "more memory"
+                        ),
+                        reason=(
+                            f"The configured memory limit is "
+                            f"{memory_limit or 'not available'}."
+                        ),
                     ),
-                ),
-                RCARecommendation(
-                    action=(
-                        "Review Kubernetes memory requests "
-                        "and limits"
+                    RCARecommendation(
+                        action=(
+                            "Investigate possible memory leaks "
+                            "or abnormal memory growth"
+                        ),
+                        reason=(
+                            "Repeated OOMKilled events can indicate "
+                            "a memory leak or unexpectedly high "
+                            "application memory consumption."
+                        ),
                     ),
-                    reason=(
-                        "Insufficient memory limits can result "
-                        "in OOMKilled containers"
+                ]
+
+            else:
+                root_cause = (
+                    f"High memory utilization or memory pressure "
+                    f"on {resource_name}"
+                )
+
+                summary = (
+                    "Monitoring detected excessive memory usage "
+                    "or an out-of-memory condition."
+                )
+
+                confidence = 0.93
+
+                recommendations = [
+                    RCARecommendation(
+                        action=(
+                            "Identify the processes or containers "
+                            "consuming excessive memory"
+                        ),
+                        reason=(
+                            "Determine the workload responsible "
+                            "for the memory pressure"
+                        ),
                     ),
-                ),
-                RCARecommendation(
-                    action=(
-                        "Check for memory leaks in the affected application"
+                    RCARecommendation(
+                        action=(
+                            "Review Kubernetes memory requests "
+                            "and limits"
+                        ),
+                        reason=(
+                            "Insufficient memory limits can result "
+                            "in OOMKilled containers"
+                        ),
                     ),
-                    reason=(
-                        "Repeated memory growth can indicate "
-                        "an application memory leak"
+                    RCARecommendation(
+                        action=(
+                            "Check for memory leaks in the "
+                            "affected application"
+                        ),
+                        reason=(
+                            "Repeated memory growth can indicate "
+                            "an application memory leak"
+                        ),
                     ),
-                ),
-            ]
+                ]
 
         # -------------------------------------------------
         # Pod CrashLoopBackOff

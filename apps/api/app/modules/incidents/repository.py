@@ -201,3 +201,19 @@ class IncidentRepository:
         await self.db.refresh(incident)
 
         return incident
+    
+    async def assign(
+        self,
+        incident: Incident,
+        user_id: str | None,
+    ) -> Incident:
+        """
+        Assign or unassign an incident.
+        """
+
+        incident.assigned_to = user_id
+
+        await self.db.commit()
+        await self.db.refresh(incident)
+
+        return incident

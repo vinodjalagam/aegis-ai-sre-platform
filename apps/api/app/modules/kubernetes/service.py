@@ -90,6 +90,51 @@ class KubernetesService:
             )
 
         return result
+    
+    def get_node_details(
+        self,
+        node_name: str,
+    ) -> dict | None:
+        """
+        Return Kubernetes node health information.
+        """
+
+        try:
+            node = self.client.core_v1.read_node(
+                name=node_name,
+            )
+        except ApiException as exc:
+            if exc.status == 404:
+                return None
+            raise
+
+        conditions = []
+
+        for condition in node.status.conditions or []:
+            conditions.append(
+                {
+                    "type": condition.type,
+                    "status": condition.status,
+                    "reason": condition.reason,
+                    "message": condition.message,
+                    "last_transition_time": (
+                        condition.last_transition_time.isoformat()
+                        if condition.last_transition_time
+                        else None
+                    ),
+                }
+            )
+
+        return {
+            "name": node.metadata.name,
+            "kubelet_version": (
+                node.status.node_info.kubelet_version
+                if node.status.node_info
+                else None
+            ),
+            "conditions": conditions,
+            "unschedulable": node.spec.unschedulable,
+        }
 
     def get_namespaces(self) -> list[str]:
         """
@@ -113,7 +158,6 @@ class KubernetesService:
         result = []
 
         for pod in pods:
-
             result.append(
                 {
                     "name": pod.metadata.name,
@@ -124,7 +168,274 @@ class KubernetesService:
             )
 
         return result
+        
+    def get_pod_details(
+        self,
+        namespace: str,
+        pod_name: str,
+    ) -> dict | None:
+        """
+        Return useful Kubernetes details for a pod.
+        """
 
+        try:
+            pod = self.client.core_v1.read_namespaced_pod(
+                name=pod_name,
+                namespace=namespace,
+            )
+        except ApiException as exc:
+            if exc.status == 404:
+                return None
+            raise
+
+        containers = []
+
+        for container in pod.spec.containers or []:
+            status = next(
+                (
+                    item
+                    for item in (pod.status.container_statuses or [])
+                    if item.name == container.name
+                ),
+                None,
+            )
+
+            resources = container.resources
+
+            last_terminated = None
+
+            if status and status.last_state and status.last_state.terminated:
+                terminated = status.last_state.terminated
+
+                last_terminated = {
+                    "reason": terminated.reason,
+                    "exit_code": terminated.exit_code,
+                    "signal": terminated.signal,
+                    "message": terminated.message,
+                    "started_at": (
+                        terminated.started_at.isoformat()
+                        if terminated.started_at
+                        else None
+                    ),
+                    "finished_at": (
+                        terminated.finished_at.isoformat()
+                        if terminated.finished_at
+                        else None
+                    ),
+                }
+
+            containers.append(
+                {
+                    "name": container.name,
+                    "image": container.image,
+                    "restart_count": (
+                        status.restart_count
+                        if status
+                        else 0
+                    ),
+                    "state": (
+                        {
+                            "status": "terminated",
+                            "reason": status.state.terminated.reason,
+                            "exit_code": status.state.terminated.exit_code,
+                            "signal": status.state.terminated.signal,
+                            "message": status.state.terminated.message,
+                            "started_at": (
+                                status.state.terminated.started_at.isoformat()
+                                if status.state.terminated.started_at
+                                else None
+                            ),
+                            "finished_at": (
+                                status.state.terminated.finished_at.isoformat()
+                                if status.state.terminated.finished_at
+                                else None
+                            ),
+                        }
+                        if status
+                        and status.state
+                        and status.state.terminated
+                        else (
+                            {
+                                "status": "waiting",
+                                "reason": status.state.waiting.reason,
+                                "message": status.state.waiting.message,
+                            }
+                            if status
+                            and status.state
+                            and status.state.waiting
+                            else (
+                                {"status": "running"}
+                                if status
+                                and status.state
+                                and status.state.running
+                                else None
+                            )
+                        )
+                    ),
+                    "last_terminated": last_terminated,
+                    "requests": (
+                        resources.requests
+                        if resources and resources.requests
+                        else {}
+                    ),
+                    "limits": (
+                        resources.limits
+                        if resources and resources.limits
+                        else {}
+                    ),
+                }
+            )
+
+        return {
+            "name": pod.metadata.name,
+            "namespace": pod.metadata.namespace,
+            "phase": pod.status.phase,
+            "node": pod.spec.node_name,
+            "pod_ip": pod.status.pod_ip,
+            "restart_policy": pod.spec.restart_policy,
+            "containers": containers,
+        }
+
+    def get_pod_logs(
+        self,
+        namespace: str,
+        pod_name: str,
+        container_name: str | None = None,
+        previous: bool = False,
+    ) -> str:
+        """
+        Return pod/container logs.
+        """
+
+        try:
+            return self.client.core_v1.read_namespaced_pod_log(
+                name=pod_name,
+                namespace=namespace,
+                container=container_name,
+                previous=previous,
+                tail_lines=200,
+            )
+        except ApiException as exc:
+            if exc.status == 400 and previous:
+                return ""
+
+            if exc.status == 404:
+                return ""
+
+            raise
+            
+    def get_pod_events(
+        self,
+        namespace: str,
+        pod_name: str,
+    ) -> list[dict]:
+        """
+        Return Kubernetes events associated with a pod.
+        """
+
+        events = self.client.core_v1.list_namespaced_event(
+            namespace=namespace,
+            field_selector=f"involvedObject.name={pod_name}",
+        ).items
+
+        result = []
+
+        for event in events:
+            result.append(
+                {
+                    "type": event.type,
+                    "reason": event.reason,
+                    "message": event.message,
+                    "count": event.count,
+                    "first_timestamp": (
+                        event.first_timestamp.isoformat()
+                        if event.first_timestamp
+                        else None
+                    ),
+                    "last_timestamp": (
+                        event.last_timestamp.isoformat()
+                        if event.last_timestamp
+                        else None
+                    ),
+                }
+            )
+
+        return result
+    
+    def find_pod_by_resource(
+        self,
+        namespace: str,
+        resource_name: str,
+    ) -> dict | None:
+        """
+        Find a pod by name or Prometheus resource name.
+        """
+
+        pods = self.client.core_v1.list_namespaced_pod(
+            namespace=namespace,
+        ).items
+
+        # First try the actual Kubernetes pod name.
+        for pod in pods:
+            if pod.metadata.name == resource_name:
+                return {
+                    "name": pod.metadata.name,
+                    "namespace": pod.metadata.namespace,
+                    "container": (
+                        pod.spec.containers[0].name
+                        if pod.spec.containers
+                        else None
+                    ),
+                }
+
+        # Fallback: Prometheus may return IP:port.
+        pod_ip = resource_name.split(":")[0]
+
+        for pod in pods:
+            if pod.status.pod_ip == pod_ip:
+                return {
+                    "name": pod.metadata.name,
+                    "namespace": pod.metadata.namespace,
+                    "container": (
+                        pod.spec.containers[0].name
+                        if pod.spec.containers
+                        else None
+                    ),
+                }
+
+        return None
+    
+    def find_node_by_resource(
+        self,
+        resource_name: str,
+    ) -> str | None:
+        """
+        Find a Kubernetes node by name or Prometheus resource name.
+        """
+
+        nodes = self.client.core_v1.list_node().items
+
+        # First try node name.
+        for node in nodes:
+            if node.metadata.name == resource_name:
+                return node.metadata.name
+
+        # Fallback: Prometheus may return IP:port.
+        node_ip = resource_name.split(":")[0]
+
+        for node in nodes:
+            if not node.status.addresses:
+                continue
+
+            for address in node.status.addresses:
+                if (
+                    address.type == "InternalIP"
+                    and address.address == node_ip
+                ):
+                    return node.metadata.name
+
+        return None
+    
     def get_services(self) -> list[dict]:
         """
         Return all services.
