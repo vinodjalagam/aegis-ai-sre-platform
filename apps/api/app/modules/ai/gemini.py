@@ -4,7 +4,10 @@ from google.genai import types
 from app.core.config.settings import settings
 from app.modules.ai.provider import AIProvider
 from app.modules.ai.schemas import AIAnalysisResult
+import logging
+from app.core.exceptions.http import ExternalServiceException
 
+logger = logging.getLogger(__name__)
 
 class GeminiProvider(AIProvider):
     """
@@ -30,20 +33,31 @@ class GeminiProvider(AIProvider):
         a validated structured RCA result.
         """
 
-        response = await self.client.aio.models.generate_content(
-            model=self.model,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=AIAnalysisResult,
-            ),
-        )
-
-        if not response.parsed:
-            raise ValueError(
-                "Gemini returned an empty or invalid analysis"
+        try:
+            response = await self.client.aio.models.generate_content(
+                model=self.model,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=AIAnalysisResult,
+                ),
             )
 
-        return AIAnalysisResult.model_validate(
-            response.parsed
-        )
+            if not response.parsed:
+                raise ValueError(
+                    "Gemini returned an empty or invalid analysis"
+                )
+
+            return AIAnalysisResult.model_validate(
+                response.parsed
+            )
+
+        except ExternalServiceException:
+            raise
+
+        except Exception:
+            logger.exception("Gemini RCA analysis failed")
+
+            raise ExternalServiceException(
+                "AI analysis service is temporarily unavailable"
+            ) from None

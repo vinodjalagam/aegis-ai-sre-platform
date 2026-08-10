@@ -10,6 +10,7 @@ from starlette.status import (
     HTTP_403_FORBIDDEN,
     HTTP_404_NOT_FOUND,
     HTTP_409_CONFLICT,
+    HTTP_502_BAD_GATEWAY,
 )
 
 from app.core.exceptions.base import AppException
@@ -68,4 +69,17 @@ class ConflictException(AppException):
             message=message,
             error_code=ErrorCode.CONFLICT,
             status_code=HTTP_409_CONFLICT,
+        )
+
+class ExternalServiceException(AppException):
+    """502 External service error."""
+
+    def __init__(
+        self,
+        message: str = "External service is temporarily unavailable",
+    ) -> None:
+        super().__init__(
+            message=message,
+            error_code=ErrorCode.EXTERNAL_SERVICE_ERROR,
+            status_code=HTTP_502_BAD_GATEWAY,
         )
