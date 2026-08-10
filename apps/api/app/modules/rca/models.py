@@ -2,7 +2,7 @@
 Root cause analysis ORM model.
 """
 
-from sqlalchemy import ForeignKey, Float, String, Text
+from sqlalchemy import ForeignKey, Float, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.models.base_model import BaseModel
@@ -44,4 +44,8 @@ class IncidentRCA(BaseModel):
         String(50),
         nullable=False,
         default="completed",
+    )
+    recommendations_json: Mapped[list | None] = mapped_column(
+        JSON,
+        nullable=True,
     )

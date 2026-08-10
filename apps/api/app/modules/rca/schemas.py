@@ -15,7 +15,7 @@ class RCACreate(BaseModel):
     summary: str | None = None
     confidence: float | None = None
     status: str = "completed"
-
+    recommendations_json: list[dict] | None = None
 class RCAResponse(BaseModel):
     """
     Root cause analysis response.
@@ -31,6 +31,7 @@ class RCAResponse(BaseModel):
     summary: str | None
     confidence: float | None
     status: str
+    recommendations_json: list[dict] | None
     created_at: datetime
 
 

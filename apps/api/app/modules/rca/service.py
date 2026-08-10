@@ -244,10 +244,10 @@ class RCAService:
         )
 
         if existing:
-            existing.root_cause = ai_result.root_cause
-            existing.summary = ai_result.summary
-            existing.confidence = ai_result.confidence
-            existing.status = "completed"
+            existing.recommendations_json = [
+                item.model_dump()
+                for item in ai_result.recommendations
+            ]
 
             await self.repository.db.commit()
             await self.repository.db.refresh(existing)
@@ -260,6 +260,10 @@ class RCAService:
                     summary=ai_result.summary,
                     confidence=ai_result.confidence,
                     status="completed",
+                    recommendations_json=[
+                        item.model_dump()
+                        for item in ai_result.recommendations
+                    ],
                 ),
             )
 
