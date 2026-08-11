@@ -10,8 +10,8 @@ class KubernetesService:
     Service for interacting with Kubernetes clusters.
     """
 
-    def __init__(self):
-        self.client = KubernetesClient()
+    def __init__(self, kubeconfig_path: str):
+        self.client = KubernetesClient(kubeconfig_path)
         self.client.connect()
 
     def connect(self) -> bool:

@@ -11,7 +11,7 @@ class KubernetesClient:
 
     def __init__(
         self,
-        kubeconfig_path: str = "/home/master/.kube/config",
+        kubeconfig_path: str,
     ):
         self.kubeconfig_path = kubeconfig_path
 

@@ -25,6 +25,8 @@ from app.modules.incidents.timeline.schemas import (
     IncidentTimelineEventCreate,
 )
 from app.modules.kubernetes.service import KubernetesService
+from app.modules.clusters.repository import ClusterRepository
+
 logger = logging.getLogger(__name__)
 
 
@@ -41,18 +43,26 @@ class IncidentDetector:
         self.db = db
         self.cluster_id = cluster_id
 
-        self.prometheus = PrometheusClient()
+        self.cluster_repository = ClusterRepository(db)
+
+        self.prometheus = None
         self.repository = IncidentRepository(db)
         self.service = IncidentService(db)
         self.evidence_service = IncidentEvidenceService(db)
         self.timeline_service = IncidentTimelineService(db)
-        self.kubernetes_service = KubernetesService()
+        self.kubernetes_service = None
+        
     async def scan(self):
         """
         Execute all configured detection rules.
         """
 
-        logger.info("Starting incident scan...")
+        await self.initialize_cluster()
+
+        logger.info(
+            "Starting incident scan for cluster %s",
+            self.cluster_id,
+        )
 
         for rule in IncidentRules.ALL_RULES:
 
@@ -368,4 +378,26 @@ class IncidentDetector:
 
         logger.info(
             "Incident scan completed."
+        )
+    async def initialize_cluster(self) -> None:
+        """
+        Initialize Kubernetes connectivity for the selected cluster.
+        """
+
+        cluster = await self.cluster_repository.get_by_id(
+            self.cluster_id
+        )
+
+        if cluster is None:
+            raise ValueError(
+                f"Cluster not found: {self.cluster_id}"
+            )
+
+        if not cluster.is_active:
+            raise ValueError(
+                f"Cluster is inactive: {cluster.name}"
+            )
+
+        self.kubernetes_service = KubernetesService(
+            cluster.kubeconfig
         )
