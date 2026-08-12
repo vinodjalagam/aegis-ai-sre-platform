@@ -217,3 +217,46 @@ class IncidentRepository:
         await self.db.refresh(incident)
 
         return incident
+    
+    async def get_by_id_for_cluster(
+        self,
+        incident_id: str,
+        cluster_id: str,
+    ) -> Incident | None:
+        """
+        Get an incident only if it belongs to the selected cluster.
+        """
+
+        result = await self.db.execute(
+            select(Incident).where(
+                Incident.id == incident_id,
+                Incident.cluster_id == cluster_id,
+            )
+        )
+
+        return result.scalar_one_or_none()
+
+
+    async def list_for_cluster(
+        self,
+        cluster_id: str,
+    ) -> tuple[list[Incident], int]:
+        """
+        Return incidents belonging to a cluster.
+        """
+
+        result = await self.db.execute(
+            select(Incident)
+            .where(Incident.cluster_id == cluster_id)
+            .order_by(Incident.created_at.desc())
+        )
+
+        incidents = list(result.scalars().all())
+
+        total = await self.db.scalar(
+            select(func.count())
+            .select_from(Incident)
+            .where(Incident.cluster_id == cluster_id)
+        )
+
+        return incidents, total or 0

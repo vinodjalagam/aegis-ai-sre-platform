@@ -25,13 +25,22 @@ router = APIRouter(
 )
 async def create_cluster(
     payload: ClusterCreate,
-    service: ClusterService = Depends(get_cluster_service),
+    current_user_id: str = Depends(
+        get_current_user_id
+    ),
+    service: ClusterService = Depends(
+        get_cluster_service
+    ),
 ):
     """
     Create a new Kubernetes cluster.
     """
+
     try:
-        cluster = await service.create_cluster(payload)
+        cluster = await service.create_cluster(
+            payload,
+            current_user_id,
+        )
 
         return success_response(
             ClusterResponse.model_validate(cluster)
@@ -43,17 +52,18 @@ async def create_cluster(
             detail=str(exc),
         ) from exc
 
-
 @router.get("")
 async def list_clusters(
     current_user_id: str = Depends(get_current_user_id),
     service: ClusterService = Depends(get_cluster_service),
 ):
     """
-    List all clusters.
+    List clusters accessible to the authenticated user.
     """
 
-    clusters = await service.list_clusters()
+    clusters = await service.list_user_clusters(
+        current_user_id
+    )
 
     response = ClusterListResponse(
         items=[
@@ -65,18 +75,24 @@ async def list_clusters(
 
     return success_response(response)
 
-
 @router.get("/{cluster_id}")
 async def get_cluster(
     cluster_id: str,
-    current_user_id: str = Depends(get_current_user_id),
-    service: ClusterService = Depends(get_cluster_service),
+    current_user_id: str = Depends(
+        get_current_user_id
+    ),
+    service: ClusterService = Depends(
+        get_cluster_service
+    ),
 ):
     """
-    Get cluster by ID.
+    Get a cluster accessible to the authenticated user.
     """
 
-    cluster = await service.get_cluster(cluster_id)
+    cluster = await service.get_user_cluster(
+        current_user_id,
+        cluster_id,
+    )
 
     if not cluster:
         raise HTTPException(
@@ -87,55 +103,105 @@ async def get_cluster(
     return success_response(
         ClusterResponse.model_validate(cluster)
     )
-
 
 @router.put("/{cluster_id}")
 async def update_cluster(
     cluster_id: str,
     payload: ClusterUpdate,
-    current_user_id: str = Depends(get_current_user_id),
-    service: ClusterService = Depends(get_cluster_service),
+    current_user_id: str = Depends(
+        get_current_user_id
+    ),
+    service: ClusterService = Depends(
+        get_cluster_service
+    ),
 ):
     """
     Update a cluster.
+
+    Only owners and admins can update a cluster.
     """
 
-    cluster = await service.update_cluster(
-        cluster_id,
-        payload,
-    )
-
-    if not cluster:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Cluster not found",
+    try:
+        await service.authorize_cluster_action(
+            current_user_id,
+            cluster_id,
+            ["owner", "admin"],
         )
 
-    return success_response(
-        ClusterResponse.model_validate(cluster)
-    )
+        cluster = await service.update_cluster(
+            cluster_id,
+            payload,
+        )
 
+        if not cluster:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Cluster not found",
+            )
+
+        return success_response(
+            ClusterResponse.model_validate(cluster)
+        )
+
+    except PermissionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        ) from exc
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
 
 @router.delete("/{cluster_id}")
 async def delete_cluster(
     cluster_id: str,
-    current_user_id: str = Depends(get_current_user_id),
-    service: ClusterService = Depends(get_cluster_service),
+    current_user_id: str = Depends(
+        get_current_user_id
+    ),
+    service: ClusterService = Depends(
+        get_cluster_service
+    ),
 ):
     """
     Delete a cluster.
+
+    Only cluster owners can delete a cluster.
     """
 
-    deleted = await service.delete_cluster(cluster_id)
-
-    if not deleted:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Cluster not found",
+    try:
+        await service.authorize_cluster_action(
+            current_user_id,
+            cluster_id,
+            ["owner"],
         )
 
-    return success_response(
-        {
-            "message": "Cluster deleted successfully",
-        }
-    )
+        deleted = await service.delete_cluster(
+            cluster_id
+        )
+
+        if not deleted:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Cluster not found",
+            )
+
+        return success_response(
+            {
+                "message": "Cluster deleted successfully",
+            }
+        )
+
+    except PermissionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        ) from exc
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc

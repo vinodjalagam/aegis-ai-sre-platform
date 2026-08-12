@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from kubernetes import client
-from kubernetes.config import load_kube_config
+import yaml
+
+from kubernetes import client, config
+from kubernetes.config.config_exception import ConfigException
 
 from app.modules.discovery.schemas import (
     DiscoveryResponse,
@@ -15,8 +17,33 @@ class DiscoveryService:
     """
 
     def __init__(self, kubeconfig: str):
-        load_kube_config(config_file=kubeconfig)
-        self.core_v1 = client.CoreV1Api()
+        """
+        Initialize discovery using the kubeconfig YAML
+        stored for the selected cluster.
+        """
+
+        try:
+            kubeconfig_dict = yaml.safe_load(kubeconfig)
+
+            if not isinstance(kubeconfig_dict, dict):
+                raise ValueError(
+                    "Invalid kubeconfig: expected YAML object"
+                )
+
+            config.load_kube_config_from_dict(
+                kubeconfig_dict
+            )
+
+            self.core_v1 = client.CoreV1Api()
+
+        except (
+            ConfigException,
+            ValueError,
+            yaml.YAMLError,
+        ) as exc:
+            raise RuntimeError(
+                f"Failed to load cluster kubeconfig: {exc}"
+            ) from exc
 
     def _find_service(
         self,
@@ -24,17 +51,25 @@ class DiscoveryService:
         preferred_ports: list[int] | None = None,
     ) -> ServiceDiscovery | None:
         """
-        Find the best matching Kubernetes service across all namespaces.
+        Find the best matching Kubernetes service
+        across all namespaces.
         """
 
-        services = self.core_v1.list_service_for_all_namespaces()
+        services = (
+            self.core_v1.list_service_for_all_namespaces()
+        )
 
         candidates = []
 
         for svc in services.items:
-            name = (svc.metadata.name or "").lower()
+            name = (
+                svc.metadata.name or ""
+            ).lower()
 
-            if not any(keyword in name for keyword in keywords):
+            if not any(
+                keyword in name
+                for keyword in keywords
+            ):
                 continue
 
             ports = [
@@ -48,16 +83,19 @@ class DiscoveryService:
 
             score = 0
 
-            # Prefer the expected service port.
+            # Prefer expected service port.
             if preferred_ports:
-                if any(port in preferred_ports for port in ports):
+                if any(
+                    port in preferred_ports
+                    for port in ports
+                ):
                     score += 100
 
             # Prefer exact/common service names.
             if name in keywords:
                 score += 50
 
-            # Prefer names ending in the service keyword.
+            # Prefer names ending in keyword.
             for keyword in keywords:
                 if name.endswith(keyword):
                     score += 20

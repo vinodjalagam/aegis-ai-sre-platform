@@ -11,6 +11,7 @@ from app.core.config import settings
 from app.db.base import Base
 from app.modules.users.models import User
 from app.modules.clusters.models import Cluster
+from app.modules.clusters.access_models import ClusterAccess
 from app.modules.incidents.models import Incident
 from app.modules.incidents.evidence.models import IncidentEvidence
 from app.modules.incidents.timeline.models import IncidentTimelineEvent

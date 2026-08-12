@@ -68,3 +68,33 @@ class DeploymentResponse(BaseModel):
     namespace: str
     replicas: int | None = None
     available: int
+    
+class ReplicaSetResponse(BaseModel):
+    """
+    Kubernetes ReplicaSet response.
+    """
+
+    name: str
+    namespace: str
+    replicas: int | None = None
+    ready: int | None = None
+    
+class StatefulSetResponse(BaseModel):
+    """
+    Kubernetes StatefulSet response.
+    """
+
+    name: str
+    namespace: str
+    replicas: int | None = None
+    ready: int | None = None
+    
+class DaemonSetResponse(BaseModel):
+    """
+    Kubernetes DaemonSet response.
+    """
+
+    name: str
+    namespace: str
+    desired: int | None = None
+    ready: int | None = None

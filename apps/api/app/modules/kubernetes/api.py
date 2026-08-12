@@ -7,6 +7,9 @@ from app.modules.kubernetes.dependencies import get_kubernetes_service
 from app.modules.kubernetes.schemas import (
     ClusterSummaryResponse,
     DeploymentResponse,
+    ReplicaSetResponse,
+    StatefulSetResponse,
+    DaemonSetResponse,
     NamespaceResponse,
     NodeResponse,
     PodResponse,
@@ -14,6 +17,7 @@ from app.modules.kubernetes.schemas import (
 )
 from app.modules.kubernetes.service import KubernetesService
 from app.shared.responses.success import success_response
+
 
 router = APIRouter(
     prefix="/kubernetes",
@@ -23,6 +27,7 @@ router = APIRouter(
 
 @router.get("/summary")
 async def get_cluster_summary(
+    cluster_id: str,
     current_user_id: str = Depends(get_current_user_id),
     service: KubernetesService = Depends(get_kubernetes_service),
 ):
@@ -39,6 +44,7 @@ async def get_cluster_summary(
 
 @router.get("/nodes")
 async def get_nodes(
+    cluster_id: str,
     current_user_id: str = Depends(get_current_user_id),
     service: KubernetesService = Depends(get_kubernetes_service),
 ):
@@ -58,6 +64,7 @@ async def get_nodes(
 
 @router.get("/namespaces")
 async def get_namespaces(
+    cluster_id: str,
     current_user_id: str = Depends(get_current_user_id),
     service: KubernetesService = Depends(get_kubernetes_service),
 ):
@@ -77,6 +84,7 @@ async def get_namespaces(
 
 @router.get("/pods")
 async def get_pods(
+    cluster_id: str,
     current_user_id: str = Depends(get_current_user_id),
     service: KubernetesService = Depends(get_kubernetes_service),
 ):
@@ -96,6 +104,7 @@ async def get_pods(
 
 @router.get("/services")
 async def get_services(
+    cluster_id: str,
     current_user_id: str = Depends(get_current_user_id),
     service: KubernetesService = Depends(get_kubernetes_service),
 ):
@@ -115,6 +124,7 @@ async def get_services(
 
 @router.get("/deployments")
 async def get_deployments(
+    cluster_id: str,
     current_user_id: str = Depends(get_current_user_id),
     service: KubernetesService = Depends(get_kubernetes_service),
 ):
@@ -128,5 +138,62 @@ async def get_deployments(
         [
             DeploymentResponse(**deployment)
             for deployment in deployments
+        ]
+    )
+    
+@router.get("/replicasets")
+async def get_replicasets(
+    cluster_id: str,
+    current_user_id: str = Depends(get_current_user_id),
+    service: KubernetesService = Depends(get_kubernetes_service),
+):
+    """
+    List Kubernetes ReplicaSets.
+    """
+
+    replicasets = service.get_replicasets()
+
+    return success_response(
+        [
+            ReplicaSetResponse(**replicaset)
+            for replicaset in replicasets
+        ]
+    )
+    
+@router.get("/statefulsets")
+async def get_statefulsets(
+    cluster_id: str,
+    current_user_id: str = Depends(get_current_user_id),
+    service: KubernetesService = Depends(get_kubernetes_service),
+):
+    """
+    List Kubernetes StatefulSets.
+    """
+
+    statefulsets = service.get_statefulsets()
+
+    return success_response(
+        [
+            StatefulSetResponse(**statefulset)
+            for statefulset in statefulsets
+        ]
+    )
+    
+@router.get("/daemonsets")
+async def get_daemonsets(
+    cluster_id: str,
+    current_user_id: str = Depends(get_current_user_id),
+    service: KubernetesService = Depends(get_kubernetes_service),
+):
+    """
+    List Kubernetes DaemonSets.
+    """
+
+    daemonsets = service.get_daemonsets()
+
+    return success_response(
+        [
+            DaemonSetResponse(**daemonset)
+            for daemonset in daemonsets
         ]
     )

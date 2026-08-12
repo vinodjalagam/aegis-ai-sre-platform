@@ -26,7 +26,8 @@ from app.modules.incidents.timeline.schemas import (
 )
 from app.modules.kubernetes.service import KubernetesService
 from app.modules.clusters.repository import ClusterRepository
-
+from app.modules.discovery.service import DiscoveryService
+from app.modules.metrics.client import PrometheusClient
 logger = logging.getLogger(__name__)
 
 
@@ -401,3 +402,18 @@ class IncidentDetector:
         self.kubernetes_service = KubernetesService(
             cluster.kubeconfig
         )
+        discovery = DiscoveryService(
+            cluster.kubeconfig
+        )
+
+        platform = discovery.discover()
+
+        if platform.prometheus:
+            self.prometheus = PrometheusClient(
+                core_v1=self.kubernetes_service.client.core_v1,
+                namespace=platform.prometheus.namespace,
+                service=platform.prometheus.service,
+                port=platform.prometheus.port,
+            )
+        else:
+            self.prometheus = None

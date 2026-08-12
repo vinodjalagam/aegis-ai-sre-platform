@@ -173,3 +173,65 @@ class IncidentService:
         )
 
         return assigned
+    
+    async def get_user_incident(
+        self,
+        user_id: str,
+        incident_id: str,
+        cluster_id: str,
+    ):
+        """
+        Return an incident only if the user has access
+        to the cluster that owns the incident.
+        """
+
+        from app.modules.clusters.access.repository import (
+            ClusterAccessRepository,
+        )
+
+        access_repository = ClusterAccessRepository(
+            self.repository.db
+        )
+
+        access = await access_repository.get(
+            user_id,
+            cluster_id,
+        )
+
+        if access is None:
+            return None
+
+        return await self.repository.get_by_id_for_cluster(
+            incident_id,
+            cluster_id,
+        )
+
+
+    async def list_user_incidents(
+        self,
+        user_id: str,
+        cluster_id: str,
+    ):
+        """
+        Return incidents only from a cluster the user can access.
+        """
+
+        from app.modules.clusters.access.repository import (
+            ClusterAccessRepository,
+        )
+
+        access_repository = ClusterAccessRepository(
+            self.repository.db
+        )
+
+        access = await access_repository.get(
+            user_id,
+            cluster_id,
+        )
+
+        if access is None:
+            return [], 0
+
+        return await self.repository.list_for_cluster(
+            cluster_id
+        )

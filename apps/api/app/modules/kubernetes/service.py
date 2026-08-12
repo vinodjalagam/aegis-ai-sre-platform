@@ -10,8 +10,8 @@ class KubernetesService:
     Service for interacting with Kubernetes clusters.
     """
 
-    def __init__(self, kubeconfig_path: str):
-        self.client = KubernetesClient(kubeconfig_path)
+    def __init__(self, kubeconfig: str):
+        self.client = KubernetesClient(kubeconfig)
         self.client.connect()
 
     def connect(self) -> bool:
@@ -483,6 +483,92 @@ class KubernetesService:
                     "namespace": deployment.metadata.namespace,
                     "replicas": deployment.spec.replicas,
                     "available": deployment.status.available_replicas or 0,
+                }
+            )
+
+        return result
+    def get_replicasets(self) -> list[dict]:
+        """
+        Return all ReplicaSets.
+        """
+
+        replicasets = (
+            self.client.apps_v1
+            .list_replica_set_for_all_namespaces()
+            .items
+        )
+
+        result = []
+
+        for replicaset in replicasets:
+            result.append(
+                {
+                    "name": replicaset.metadata.name,
+                    "namespace": replicaset.metadata.namespace,
+                    "replicas": replicaset.spec.replicas,
+                    "ready": (
+                        replicaset.status.ready_replicas
+                        or 0
+                    ),
+                }
+            )
+
+        return result
+    
+    def get_statefulsets(self) -> list[dict]:
+        """
+        Return all StatefulSets.
+        """
+
+        statefulsets = (
+            self.client.apps_v1
+            .list_stateful_set_for_all_namespaces()
+            .items
+        )
+
+        result = []
+
+        for statefulset in statefulsets:
+            result.append(
+                {
+                    "name": statefulset.metadata.name,
+                    "namespace": statefulset.metadata.namespace,
+                    "replicas": statefulset.spec.replicas,
+                    "ready": (
+                        statefulset.status.ready_replicas
+                        or 0
+                    ),
+                }
+            )
+
+        return result
+
+    def get_daemonsets(self) -> list[dict]:
+        """
+        Return all DaemonSets.
+        """
+
+        daemonsets = (
+            self.client.apps_v1
+            .list_daemon_set_for_all_namespaces()
+            .items
+        )
+
+        result = []
+
+        for daemonset in daemonsets:
+            result.append(
+                {
+                    "name": daemonset.metadata.name,
+                    "namespace": daemonset.metadata.namespace,
+                    "desired": (
+                        daemonset.status.desired_number_scheduled
+                        or 0
+                    ),
+                    "ready": (
+                        daemonset.status.number_ready
+                        or 0
+                    ),
                 }
             )
 

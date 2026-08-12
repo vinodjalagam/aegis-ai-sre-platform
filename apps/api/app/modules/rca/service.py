@@ -2,8 +2,7 @@
 Root cause analysis service.
 """
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.modules.ai.gemini import GeminiProvider
-
+from app.modules.ai.agent_impl import AegisAgent
 from app.modules.incidents.evidence.repository import (
     IncidentEvidenceRepository,
 )
@@ -15,6 +14,8 @@ from app.modules.rca.schemas import (
     RCARecommendation,
 )
 from app.modules.kubernetes.service import KubernetesService
+from app.modules.incidents.repository import IncidentRepository
+from app.modules.clusters.repository import ClusterRepository
 
 class RCAService:
     """
@@ -25,11 +26,17 @@ class RCAService:
         self,
         db: AsyncSession,
     ):
+        self.db = db
         self.repository = RCARepository(db)
         self.evidence_repository = IncidentEvidenceRepository(db)
-        self.kubernetes_service = KubernetesService()
-        self.ai_provider = GeminiProvider()
 
+        self.incident_repository = IncidentRepository(db)
+        self.cluster_repository = ClusterRepository(db)
+
+        self.kubernetes_service: KubernetesService | None = None
+
+        self.ai_agent: AegisAgent | None = None
+        
     async def create(
         self,
         incident_id: str,
@@ -212,6 +219,35 @@ class RCAService:
         """
         Analyze incident evidence using the configured AI provider.
         """
+        incident = await self.incident_repository.get_by_id(
+            incident_id
+        )
+
+        if incident is None:
+            raise ValueError(
+                f"Incident not found: {incident_id}"
+            )
+
+        cluster = await self.cluster_repository.get_by_id(
+            incident.cluster_id
+        )
+
+        if cluster is None:
+            raise ValueError(
+                f"Cluster not found: {incident.cluster_id}"
+            )
+
+        if not cluster.is_active:
+            raise ValueError(
+                f"Cluster is inactive: {cluster.name}"
+            )
+
+        self.kubernetes_service = KubernetesService(
+            cluster.kubeconfig
+        )
+        self.ai_agent = AegisAgent(
+            cluster.kubeconfig
+        )
 
         evidence = await self.evidence_repository.list_by_incident(
             incident_id
@@ -222,21 +258,21 @@ class RCAService:
                 "No evidence found for incident"
             )
 
-        latest = evidence[-1]
-
-        kubernetes_context = self._collect_kubernetes_context(
-            latest.namespace,
-            latest.resource_name,
-        )
-
-        prompt = self._build_ai_prompt(
-            incident_id,
-            evidence,
-            kubernetes_context,
-        )
-
-        ai_result = await self.ai_provider.analyze(
-            prompt
+        ai_result = await self.ai_agent.analyze_incident(
+            incident_id=incident_id,
+            context={
+                "evidence": [
+                    {
+                        "title": item.title,
+                        "description": item.description,
+                        "query": item.query,
+                        "evidence_type": item.evidence_type,
+                        "resource_name": item.resource_name,
+                        "namespace": item.namespace,
+                    }
+                    for item in evidence
+                ],                
+            },
         )
 
         existing = await self.repository.get_by_incident(
