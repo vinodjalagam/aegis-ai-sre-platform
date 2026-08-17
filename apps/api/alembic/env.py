@@ -17,6 +17,9 @@ from app.modules.incidents.evidence.models import IncidentEvidence
 from app.modules.incidents.timeline.models import IncidentTimelineEvent
 from app.modules.rca.models import IncidentRCA
 from app.modules.incidents.comments.models import IncidentComment
+from app.modules.incidents.remediation.models import (
+    IncidentRemediation,
+)
 # Import all models so Alembic can discover them
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

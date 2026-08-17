@@ -8,6 +8,7 @@ from app.modules.ai.evidence.kubernetes import KubernetesEvidenceProvider
 from app.modules.ai.evidence.prometheus import (
     PrometheusEvidenceProvider,
 )
+
 class AegisAgent(AIAgent):
     """
     Initial Aegis AI agent.

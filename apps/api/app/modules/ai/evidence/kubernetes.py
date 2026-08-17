@@ -15,6 +15,7 @@ class KubernetesEvidenceProvider(EvidenceProvider):
         self.tool = KubernetesInvestigationTool(
             kubeconfig
         )
+        
     @property
     def core_v1(self):
         """

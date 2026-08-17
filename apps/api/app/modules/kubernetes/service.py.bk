@@ -1,9 +1,6 @@
 from __future__ import annotations
-
-import difflib
 import yaml
-import time
-
+import difflib
 from kubernetes.client import ApiException
 
 from app.modules.kubernetes.client import KubernetesClient
@@ -59,9 +56,10 @@ class KubernetesService:
         result = []
 
         for node in nodes:
+
             roles = []
 
-            labels = node.metadata.labels or {}
+            labels = node.metadata.labels
 
             if "node-role.kubernetes.io/control-plane" in labels:
                 roles.append("control-plane")
@@ -74,7 +72,7 @@ class KubernetesService:
 
             status = "Unknown"
 
-            for condition in node.status.conditions or []:
+            for condition in node.status.conditions:
                 if (
                     condition.type == "Ready"
                     and condition.status == "True"
@@ -86,26 +84,14 @@ class KubernetesService:
                     "name": node.metadata.name,
                     "status": status,
                     "roles": ", ".join(roles),
-                    "kubelet_version": (
-                        node.status.node_info.kubelet_version
-                        if node.status.node_info
-                        else None
-                    ),
-                    "os": (
-                        node.status.node_info.operating_system
-                        if node.status.node_info
-                        else None
-                    ),
-                    "architecture": (
-                        node.status.node_info.architecture
-                        if node.status.node_info
-                        else None
-                    ),
+                    "kubelet_version": node.status.node_info.kubelet_version,
+                    "os": node.status.node_info.operating_system,
+                    "architecture": node.status.node_info.architecture,
                 }
             )
 
         return result
-
+    
     def get_node_details(
         self,
         node_name: str,
@@ -156,11 +142,7 @@ class KubernetesService:
         Return all namespaces.
         """
 
-        namespaces = (
-            self.client.core_v1
-            .list_namespace()
-            .items
-        )
+        namespaces = self.client.core_v1.list_namespace().items
 
         return [
             namespace.metadata.name
@@ -172,11 +154,7 @@ class KubernetesService:
         Return all pods.
         """
 
-        pods = (
-            self.client.core_v1
-            .list_pod_for_all_namespaces()
-            .items
-        )
+        pods = self.client.core_v1.list_pod_for_all_namespaces().items
 
         result = []
 
@@ -191,7 +169,7 @@ class KubernetesService:
             )
 
         return result
-
+        
     def get_pod_details(
         self,
         namespace: str,
@@ -217,9 +195,7 @@ class KubernetesService:
             status = next(
                 (
                     item
-                    for item in (
-                        pod.status.container_statuses or []
-                    )
+                    for item in (pod.status.container_statuses or [])
                     if item.name == container.name
                 ),
                 None,
@@ -229,11 +205,7 @@ class KubernetesService:
 
             last_terminated = None
 
-            if (
-                status
-                and status.last_state
-                and status.last_state.terminated
-            ):
+            if status and status.last_state and status.last_state.terminated:
                 terminated = status.last_state.terminated
 
                 last_terminated = {
@@ -265,18 +237,10 @@ class KubernetesService:
                     "state": (
                         {
                             "status": "terminated",
-                            "reason": (
-                                status.state.terminated.reason
-                            ),
-                            "exit_code": (
-                                status.state.terminated.exit_code
-                            ),
-                            "signal": (
-                                status.state.terminated.signal
-                            ),
-                            "message": (
-                                status.state.terminated.message
-                            ),
+                            "reason": status.state.terminated.reason,
+                            "exit_code": status.state.terminated.exit_code,
+                            "signal": status.state.terminated.signal,
+                            "message": status.state.terminated.message,
                             "started_at": (
                                 status.state.terminated.started_at.isoformat()
                                 if status.state.terminated.started_at
@@ -288,33 +252,23 @@ class KubernetesService:
                                 else None
                             ),
                         }
-                        if (
-                            status
-                            and status.state
-                            and status.state.terminated
-                        )
+                        if status
+                        and status.state
+                        and status.state.terminated
                         else (
                             {
                                 "status": "waiting",
-                                "reason": (
-                                    status.state.waiting.reason
-                                ),
-                                "message": (
-                                    status.state.waiting.message
-                                ),
+                                "reason": status.state.waiting.reason,
+                                "message": status.state.waiting.message,
                             }
-                            if (
-                                status
-                                and status.state
-                                and status.state.waiting
-                            )
+                            if status
+                            and status.state
+                            and status.state.waiting
                             else (
                                 {"status": "running"}
-                                if (
-                                    status
-                                    and status.state
-                                    and status.state.running
-                                )
+                                if status
+                                and status.state
+                                and status.state.running
                                 else None
                             )
                         )
@@ -370,7 +324,7 @@ class KubernetesService:
                 return ""
 
             raise
-
+            
     def get_pod_events(
         self,
         namespace: str,
@@ -380,16 +334,10 @@ class KubernetesService:
         Return Kubernetes events associated with a pod.
         """
 
-        events = (
-            self.client.core_v1
-            .list_namespaced_event(
-                namespace=namespace,
-                field_selector=(
-                    f"involvedObject.name={pod_name}"
-                ),
-            )
-            .items
-        )
+        events = self.client.core_v1.list_namespaced_event(
+            namespace=namespace,
+            field_selector=f"involvedObject.name={pod_name}",
+        ).items
 
         result = []
 
@@ -414,7 +362,7 @@ class KubernetesService:
             )
 
         return result
-
+    
     def find_pod_by_resource(
         self,
         namespace: str,
@@ -424,14 +372,11 @@ class KubernetesService:
         Find a pod by name or Prometheus resource name.
         """
 
-        pods = (
-            self.client.core_v1
-            .list_namespaced_pod(
-                namespace=namespace,
-            )
-            .items
-        )
+        pods = self.client.core_v1.list_namespaced_pod(
+            namespace=namespace,
+        ).items
 
+        # First try the actual Kubernetes pod name.
         for pod in pods:
             if pod.metadata.name == resource_name:
                 return {
@@ -444,6 +389,7 @@ class KubernetesService:
                     ),
                 }
 
+        # Fallback: Prometheus may return IP:port.
         pod_ip = resource_name.split(":")[0]
 
         for pod in pods:
@@ -459,7 +405,7 @@ class KubernetesService:
                 }
 
         return None
-
+    
     def find_node_by_resource(
         self,
         resource_name: str,
@@ -470,10 +416,12 @@ class KubernetesService:
 
         nodes = self.client.core_v1.list_node().items
 
+        # First try node name.
         for node in nodes:
             if node.metadata.name == resource_name:
                 return node.metadata.name
 
+        # Fallback: Prometheus may return IP:port.
         node_ip = resource_name.split(":")[0]
 
         for node in nodes:
@@ -488,7 +436,7 @@ class KubernetesService:
                     return node.metadata.name
 
         return None
-
+    
     def get_services(self) -> list[dict]:
         """
         Return all services.
@@ -503,6 +451,7 @@ class KubernetesService:
         result = []
 
         for service in services:
+
             result.append(
                 {
                     "name": service.metadata.name,
@@ -528,19 +477,17 @@ class KubernetesService:
         result = []
 
         for deployment in deployments:
+
             result.append(
                 {
                     "name": deployment.metadata.name,
                     "namespace": deployment.metadata.namespace,
                     "replicas": deployment.spec.replicas,
-                    "available": (
-                        deployment.status.available_replicas or 0
-                    ),
+                    "available": deployment.status.available_replicas or 0,
                 }
             )
 
         return result
-
     def get_replicasets(self) -> list[dict]:
         """
         Return all ReplicaSets.
@@ -561,13 +508,14 @@ class KubernetesService:
                     "namespace": replicaset.metadata.namespace,
                     "replicas": replicaset.spec.replicas,
                     "ready": (
-                        replicaset.status.ready_replicas or 0
+                        replicaset.status.ready_replicas
+                        or 0
                     ),
                 }
             )
 
         return result
-
+    
     def get_statefulsets(self) -> list[dict]:
         """
         Return all StatefulSets.
@@ -588,7 +536,8 @@ class KubernetesService:
                     "namespace": statefulset.metadata.namespace,
                     "replicas": statefulset.spec.replicas,
                     "ready": (
-                        statefulset.status.ready_replicas or 0
+                        statefulset.status.ready_replicas
+                        or 0
                     ),
                 }
             )
@@ -618,13 +567,14 @@ class KubernetesService:
                         or 0
                     ),
                     "ready": (
-                        daemonset.status.number_ready or 0
+                        daemonset.status.number_ready
+                        or 0
                     ),
                 }
             )
 
         return result
-
+    
     def get_resource_manifest(
         self,
         namespace: str,
@@ -640,81 +590,56 @@ class KubernetesService:
 
         try:
             if resource_type == "deployment":
-                resource = (
-                    self.client.apps_v1
-                    .read_namespaced_deployment(
-                        name=resource_name,
-                        namespace=namespace,
-                    )
+                resource = self.client.apps_v1.read_namespaced_deployment(
+                    name=resource_name,
+                    namespace=namespace,
                 )
 
             elif resource_type == "statefulset":
-                resource = (
-                    self.client.apps_v1
-                    .read_namespaced_stateful_set(
-                        name=resource_name,
-                        namespace=namespace,
-                    )
+                resource = self.client.apps_v1.read_namespaced_stateful_set(
+                    name=resource_name,
+                    namespace=namespace,
                 )
 
             elif resource_type == "daemonset":
-                resource = (
-                    self.client.apps_v1
-                    .read_namespaced_daemon_set(
-                        name=resource_name,
-                        namespace=namespace,
-                    )
+                resource = self.client.apps_v1.read_namespaced_daemon_set(
+                    name=resource_name,
+                    namespace=namespace,
                 )
 
             elif resource_type == "replicaset":
-                resource = (
-                    self.client.apps_v1
-                    .read_namespaced_replica_set(
-                        name=resource_name,
-                        namespace=namespace,
-                    )
+                resource = self.client.apps_v1.read_namespaced_replica_set(
+                    name=resource_name,
+                    namespace=namespace,
                 )
 
             elif resource_type == "pod":
-                resource = (
-                    self.client.core_v1
-                    .read_namespaced_pod(
-                        name=resource_name,
-                        namespace=namespace,
-                    )
+                resource = self.client.core_v1.read_namespaced_pod(
+                    name=resource_name,
+                    namespace=namespace,
                 )
 
             elif resource_type == "service":
-                resource = (
-                    self.client.core_v1
-                    .read_namespaced_service(
-                        name=resource_name,
-                        namespace=namespace,
-                    )
+                resource = self.client.core_v1.read_namespaced_service(
+                    name=resource_name,
+                    namespace=namespace,
                 )
 
             elif resource_type == "configmap":
-                resource = (
-                    self.client.core_v1
-                    .read_namespaced_config_map(
-                        name=resource_name,
-                        namespace=namespace,
-                    )
+                resource = self.client.core_v1.read_namespaced_config_map(
+                    name=resource_name,
+                    namespace=namespace,
                 )
 
             elif resource_type == "secret":
-                resource = (
-                    self.client.core_v1
-                    .read_namespaced_secret(
-                        name=resource_name,
-                        namespace=namespace,
-                    )
+                resource = self.client.core_v1.read_namespaced_secret(
+                    name=resource_name,
+                    namespace=namespace,
                 )
 
             else:
                 raise ValueError(
-                    "Unsupported Kubernetes resource type: "
-                    f"{resource_type}"
+                    f"Unsupported Kubernetes resource type: {resource_type}"
                 )
 
         except ApiException as exc:
@@ -723,7 +648,7 @@ class KubernetesService:
             raise
 
         return resource.to_dict()
-
+    
     def get_resource_yaml(
         self,
         namespace: str,
@@ -746,6 +671,10 @@ class KubernetesService:
         if manifest is None:
             return None
 
+        # --------------------------------------------------
+        # Remove runtime metadata
+        # --------------------------------------------------
+
         metadata = manifest.get("metadata", {})
 
         for field in (
@@ -761,19 +690,15 @@ class KubernetesService:
         ):
             metadata.pop(field, None)
 
+        # Remove cluster-generated networking annotations.
         annotations = metadata.get("annotations")
 
         if annotations:
             annotations = {
                 key: value
                 for key, value in annotations.items()
-                if not key.startswith(
-                    "cni.projectcalico.org/"
-                )
-                and key != (
-                    "kubectl.kubernetes.io/"
-                    "last-applied-configuration"
-                )
+                if not key.startswith("cni.projectcalico.org/")
+                and key != "kubectl.kubernetes.io/last-applied-configuration"
             }
 
             if annotations:
@@ -783,7 +708,15 @@ class KubernetesService:
 
         manifest["metadata"] = metadata
 
+        # --------------------------------------------------
+        # Remove runtime status
+        # --------------------------------------------------
+
         manifest.pop("status", None)
+
+        # --------------------------------------------------
+        # Clean Pod-specific runtime/default fields
+        # --------------------------------------------------
 
         if resource_type.lower() == "pod":
             spec = manifest.get("spec", {})
@@ -826,6 +759,10 @@ class KubernetesService:
             ):
                 spec.pop(field, None)
 
+            # --------------------------------------------------
+            # Clean containers
+            # --------------------------------------------------
+
             for container in spec.get("containers", []):
                 for field in (
                     "args",
@@ -865,13 +802,19 @@ class KubernetesService:
                     if not resources:
                         container.pop("resources", None)
 
+            # --------------------------------------------------
+            # Remove automatically injected service-account volume
+            # --------------------------------------------------
+
             volumes = spec.get("volumes", [])
 
             volumes = [
                 volume
                 for volume in volumes
-                if not volume.get("name", "").startswith(
-                    "kube-api-access-"
+                if not (
+                    volume.get("name", "").startswith(
+                        "kube-api-access-"
+                    )
                 )
             ]
 
@@ -880,6 +823,7 @@ class KubernetesService:
             else:
                 spec.pop("volumes", None)
 
+            # Remove empty lists/dicts where appropriate.
             for field in (
                 "init_containers",
                 "image_pull_secrets",
@@ -889,6 +833,10 @@ class KubernetesService:
                     spec.pop(field, None)
 
             manifest["spec"] = spec
+        
+            # --------------------------------------------------
+            # Remove remaining empty metadata fields
+            # --------------------------------------------------
 
             metadata = manifest.get("metadata", {})
 
@@ -899,6 +847,10 @@ class KubernetesService:
             ):
                 if metadata.get(field) is None:
                     metadata.pop(field, None)
+
+            # --------------------------------------------------
+            # Remove remaining empty spec fields
+            # --------------------------------------------------
 
             spec = manifest.get("spec", {})
 
@@ -920,7 +872,43 @@ class KubernetesService:
             sort_keys=False,
             default_flow_style=False,
         )
+                
+        def _to_kubernetes_keys(self, value):
+        """
+        Convert Python Kubernetes-client snake_case keys
+        back to Kubernetes API camelCase keys.
+        """
 
+        key_map = {
+            "api_version": "apiVersion",
+            "restart_policy": "restartPolicy",
+            "image_pull_policy": "imagePullPolicy",
+            "volume_mounts": "volumeMounts",
+            "termination_message_path": "terminationMessagePath",
+            "termination_message_policy": "terminationMessagePolicy",
+            "node_selector": "nodeSelector",
+            "service_account": "serviceAccount",
+            "service_account_name": "serviceAccountName",
+            "dns_policy": "dnsPolicy",
+            "enable_service_links": "enableServiceLinks",
+            "security_context": "securityContext",
+            "termination_grace_period_seconds": "terminationGracePeriodSeconds",
+        }
+
+        if isinstance(value, dict):
+            return {
+                key_map.get(key, key): self._to_kubernetes_keys(item)
+                for key, item in value.items()
+            }
+
+        if isinstance(value, list):
+            return [
+                self._to_kubernetes_keys(item)
+                for item in value
+            ]
+
+        return value
+    
     def validate_resource_yaml(
         self,
         namespace: str,
@@ -950,9 +938,7 @@ class KubernetesService:
                 "resource_type": None,
                 "name": None,
                 "namespace": None,
-                "message": (
-                    "YAML must contain a Kubernetes object."
-                ),
+                "message": "YAML must contain a Kubernetes object.",
             }
 
         api_version = manifest.get("apiVersion")
@@ -986,9 +972,7 @@ class KubernetesService:
                 "resource_type": kind,
                 "name": None,
                 "namespace": manifest_namespace,
-                "message": (
-                    "Missing required field: metadata.name."
-                ),
+                "message": "Missing required field: metadata.name.",
             }
 
         if name != resource_name:
@@ -998,8 +982,7 @@ class KubernetesService:
                 "name": name,
                 "namespace": manifest_namespace,
                 "message": (
-                    "Manifest name does not match "
-                    "the requested resource."
+                    "Manifest name does not match the requested resource."
                 ),
             }
 
@@ -1034,7 +1017,7 @@ class KubernetesService:
             "namespace": manifest_namespace or namespace,
             "message": "Kubernetes YAML is valid.",
         }
-
+    
     def diff_resource_yaml(
         self,
         namespace: str,
@@ -1071,9 +1054,7 @@ class KubernetesService:
             return {
                 "changed": True,
                 "diff": "",
-                "message": (
-                    "Current Kubernetes resource was not found."
-                ),
+                "message": "Current Kubernetes resource was not found.",
             }
 
         current_lines = current_yaml.splitlines(
@@ -1102,7 +1083,7 @@ class KubernetesService:
                 else "No changes detected."
             ),
         }
-
+    
     def apply_resource_yaml(
         self,
         namespace: str,
@@ -1113,8 +1094,7 @@ class KubernetesService:
         """
         Apply an existing Kubernetes resource.
 
-        Only updates an existing resource.
-        Does not create or delete.
+        Only updates an existing resource. Does not create or delete.
         """
 
         validation = self.validate_resource_yaml(
@@ -1147,36 +1127,23 @@ class KubernetesService:
                 "resource_type": resource_type,
                 "name": resource_name,
                 "namespace": namespace,
-                "message": (
-                    "Resource does not exist. "
-                    "Creation is not allowed."
-                ),
+                "message": "Resource does not exist. Creation is not allowed.",
             }
 
         try:
-            kind = resource_type.lower()
-
-            # --------------------------------------------------
-            # Pod
-            # --------------------------------------------------
-
-            if kind == "pod":
+            if resource_type.lower() == "pod":
                 return {
                     "applied": False,
                     "resource_type": resource_type,
                     "name": resource_name,
                     "namespace": namespace,
                     "message": (
-                        "Direct Pod updates are not supported "
-                        "for resource changes such as CPU or memory."
+                        "Direct Pod updates are not supported for resource "
+                        "changes such as CPU or memory."
                     ),
                 }
 
-            # --------------------------------------------------
-            # Deployment
-            # --------------------------------------------------
-
-            if kind == "deployment":
+            elif resource_type.lower() == "deployment":
                 containers = (
                     manifest.get("spec", {})
                     .get("template", {})
@@ -1190,12 +1157,8 @@ class KubernetesService:
                         "resource_type": resource_type,
                         "name": resource_name,
                         "namespace": namespace,
-                        "message": (
-                            "Deployment contains no containers."
-                        ),
+                        "message": "Deployment contains no containers.",
                     }
-
-                patched = False
 
                 for container in containers:
                     container_name = container.get("name")
@@ -1211,87 +1174,25 @@ class KubernetesService:
                         resources=resources,
                     )
 
-                    patched = True
-
-                if not patched:
-                    return {
-                        "applied": False,
-                        "resource_type": resource_type,
-                        "name": resource_name,
-                        "namespace": namespace,
-                        "message": (
-                            "No container resource changes were found "
-                            "in the proposed Deployment YAML."
-                        ),
-                    }
-
-                rollout = self.wait_for_deployment_rollout(
-                namespace=namespace,
-                deployment_name=resource_name,
-            )
-
-            if not rollout["healthy"]:
                 return {
                     "applied": True,
                     "resource_type": "Deployment",
                     "name": resource_name,
                     "namespace": namespace,
-                    "message": (
-                        "Deployment was updated, but rollout "
-                        "did not complete successfully."
-                    ),
-                    "rollout": rollout,
-                    "verification": {
-                        "status": "not_resolved",
-                        "healthy": False,
-                    },
+                    "message": "Deployment resources updated successfully.",
                 }
 
-            verification = self.verify_deployment_remediation(
-                namespace=namespace,
-                deployment_name=resource_name,
-            )
-
-            if not verification["healthy"]:
+            else:
                 return {
-                    "applied": True,
-                    "resource_type": "Deployment",
+                    "applied": False,
+                    "resource_type": resource_type,
                     "name": resource_name,
                     "namespace": namespace,
                     "message": (
-                        "Deployment rollout completed, but "
-                        "remediation verification failed."
+                        f"Apply is not supported for resource type "
+                        f"'{resource_type}'."
                     ),
-                    "rollout": rollout,
-                    "verification": verification,
                 }
-
-            return {
-                "applied": True,
-                "resource_type": "Deployment",
-                "name": resource_name,
-                "namespace": namespace,
-                "message": (
-                    "Deployment updated, rollout completed, "
-                    "and remediation verification succeeded."
-                ),
-                "rollout": rollout,
-                "verification": verification,
-            }
-            # --------------------------------------------------
-            # Unsupported
-            # --------------------------------------------------
-
-            return {
-                "applied": False,
-                "resource_type": resource_type,
-                "name": resource_name,
-                "namespace": namespace,
-                "message": (
-                    "Apply is not supported for resource type "
-                    f"'{resource_type}'."
-                ),
-            }
 
         except Exception as exc:
             return {
@@ -1302,6 +1203,14 @@ class KubernetesService:
                 "message": f"Apply failed: {exc}",
             }
 
+        return {
+            "applied": True,
+            "resource_type": resource_type,
+            "name": resource_name,
+            "namespace": namespace,
+            "message": "Kubernetes resource updated successfully.",
+        }
+        
     def get_pod_owner(
         self,
         namespace: str,
@@ -1326,11 +1235,9 @@ class KubernetesService:
         if owner.kind == "ReplicaSet":
             apps = self.client.apps_v1
 
-            replicaset = (
-                apps.read_namespaced_replica_set(
-                    name=owner.name,
-                    namespace=namespace,
-                )
+            replicaset = apps.read_namespaced_replica_set(
+                name=owner.name,
+                namespace=namespace,
             )
 
             rs_owners = (
@@ -1355,7 +1262,7 @@ class KubernetesService:
             "kind": owner.kind,
             "name": owner.name,
         }
-
+        
     def patch_deployment_resources(
         self,
         namespace: str,
@@ -1366,7 +1273,6 @@ class KubernetesService:
         """
         Patch CPU/memory resources on a Deployment container.
         """
-
         body = {
             "spec": {
                 "template": {
@@ -1382,305 +1288,16 @@ class KubernetesService:
             }
         }
 
-        deployment = (
-            self.client.apps_v1
-            .patch_namespaced_deployment(
-                name=deployment_name,
-                namespace=namespace,
-                body=body,
-            )
+        deployment = self.client.apps_v1.patch_namespaced_deployment(
+            name=deployment_name,
+            namespace=namespace,
+            body=body,
         )
 
         return {
-            "kind": "Deployment",
-            "name": deployment.metadata.name,
+            "resource_type": resource_type,
+            "name": resource_name,
             "namespace": namespace,
+            "applied": True,
+            "message": f"{kind} '{resource_name}' applied successfully",
         }
-
-    def _to_kubernetes_keys(self, value):
-        """
-        Convert Python Kubernetes-client snake_case keys
-        back to Kubernetes API camelCase keys.
-        """
-
-        key_map = {
-            "api_version": "apiVersion",
-            "restart_policy": "restartPolicy",
-            "image_pull_policy": "imagePullPolicy",
-            "volume_mounts": "volumeMounts",
-            "termination_message_path": "terminationMessagePath",
-            "termination_message_policy": "terminationMessagePolicy",
-            "node_selector": "nodeSelector",
-            "service_account": "serviceAccount",
-            "service_account_name": "serviceAccountName",
-            "dns_policy": "dnsPolicy",
-            "enable_service_links": "enableServiceLinks",
-            "security_context": "securityContext",
-            "termination_grace_period_seconds": (
-                "terminationGracePeriodSeconds"
-            ),
-        }
-
-        if isinstance(value, dict):
-            return {
-                key_map.get(key, key): self._to_kubernetes_keys(item)
-                for key, item in value.items()
-            }
-
-        if isinstance(value, list):
-            return [
-                self._to_kubernetes_keys(item)
-                for item in value
-            ]
-
-        return value
-    
-    def wait_for_deployment_rollout(
-        self,
-        namespace: str,
-        deployment_name: str,
-        timeout_seconds: int = 120,
-        poll_interval: int = 2,
-    ) -> dict:
-        """
-        Wait for a Deployment rollout to complete and verify
-        that the resulting Pods are healthy.
-        """
-
-        apps = self.client.apps_v1
-        core = self.client.core_v1
-
-        deadline = time.time() + timeout_seconds
-
-        while time.time() < deadline:
-            deployment = apps.read_namespaced_deployment(
-                name=deployment_name,
-                namespace=namespace,
-            )
-
-            desired = deployment.spec.replicas or 0
-            updated = deployment.status.updated_replicas or 0
-            available = deployment.status.available_replicas or 0
-            unavailable = (
-                deployment.status.unavailable_replicas or 0
-            )
-
-            generation = deployment.metadata.generation or 0
-            observed_generation = (
-                deployment.status.observed_generation or 0
-            )
-
-            rollout_complete = (
-                observed_generation >= generation
-                and updated == desired
-                and available == desired
-                and unavailable == 0
-            )
-
-            if rollout_complete:
-                selector = deployment.spec.selector.match_labels or {}
-
-                label_selector = ",".join(
-                    f"{key}={value}"
-                    for key, value in selector.items()
-                )
-
-                pods = core.list_namespaced_pod(
-                    namespace=namespace,
-                    label_selector=label_selector,
-                ).items
-
-                healthy_pods = []
-
-                for pod in pods:
-                    if pod.metadata.deletion_timestamp:
-                        continue
-
-                    ready = False
-
-                    for condition in pod.status.conditions or []:
-                        if (
-                            condition.type == "Ready"
-                            and condition.status == "True"
-                        ):
-                            ready = True
-                            break
-
-                    if ready:
-                        healthy_pods.append(
-                            pod.metadata.name
-                        )
-
-                return {
-                    "rollout": "successful",
-                    "healthy": True,
-                    "desired_replicas": desired,
-                    "updated_replicas": updated,
-                    "available_replicas": available,
-                    "healthy_pods": healthy_pods,
-                }
-
-            time.sleep(poll_interval)
-
-        return {
-            "rollout": "timeout",
-            "healthy": False,
-            "desired_replicas": (
-                deployment.spec.replicas or 0
-            ),
-            "updated_replicas": (
-                deployment.status.updated_replicas or 0
-            ),
-            "available_replicas": (
-                deployment.status.available_replicas or 0
-            ),
-            "message": (
-                f"Deployment '{deployment_name}' did not "
-                f"complete rollout within "
-                f"{timeout_seconds} seconds."
-            ),
-        }
-        
-    def verify_deployment_remediation(
-        self,
-        namespace: str,
-        deployment_name: str,
-    ) -> dict:
-        """
-        Verify that a Deployment's resulting Pods are healthy.
-
-        This verification does not depend on Prometheus.
-        """
-
-        apps = self.client.apps_v1
-        core = self.client.core_v1
-
-        try:
-            deployment = apps.read_namespaced_deployment(
-                name=deployment_name,
-                namespace=namespace,
-            )
-
-            desired = deployment.spec.replicas or 0
-            available = deployment.status.available_replicas or 0
-            ready_replicas = (
-                deployment.status.ready_replicas or 0
-            )
-
-            selector = deployment.spec.selector.match_labels or {}
-
-            label_selector = ",".join(
-                f"{key}={value}"
-                for key, value in selector.items()
-            )
-
-            pods = core.list_namespaced_pod(
-                namespace=namespace,
-                label_selector=label_selector,
-            ).items
-
-            pod_results = []
-            healthy_pods = []
-
-            for pod in pods:
-                if pod.metadata.deletion_timestamp:
-                    continue
-
-                ready = False
-
-                for condition in pod.status.conditions or []:
-                    if (
-                        condition.type == "Ready"
-                        and condition.status == "True"
-                    ):
-                        ready = True
-                        break
-
-                container_results = []
-
-                for container_status in (
-                    pod.status.container_statuses or []
-                ):
-                    state = container_status.state
-
-                    if state and state.running:
-                        container_state = "running"
-                    elif state and state.terminated:
-                        container_state = "terminated"
-                    elif state and state.waiting:
-                        container_state = "waiting"
-                    else:
-                        container_state = "unknown"
-
-                    container_results.append(
-                        {
-                            "name": container_status.name,
-                            "state": container_state,
-                            "ready": container_status.ready,
-                            "restart_count": (
-                                container_status.restart_count
-                            ),
-                            "reason": (
-                                state.terminated.reason
-                                if state
-                                and state.terminated
-                                else (
-                                    state.waiting.reason
-                                    if state
-                                    and state.waiting
-                                    else None
-                                )
-                            ),
-                        }
-                    )
-
-                pod_healthy = (
-                    ready
-                    and pod.status.phase == "Running"
-                    and all(
-                        container["ready"]
-                        and container["state"] == "running"
-                        for container in container_results
-                    )
-                )
-
-                if pod_healthy:
-                    healthy_pods.append(
-                        pod.metadata.name
-                    )
-
-                pod_results.append(
-                    {
-                        "name": pod.metadata.name,
-                        "phase": pod.status.phase,
-                        "ready": ready,
-                        "healthy": pod_healthy,
-                        "containers": container_results,
-                    }
-                )
-
-            healthy = (
-                desired > 0
-                and ready_replicas >= desired
-                and available >= desired
-                and len(healthy_pods) >= desired
-            )
-
-            return {
-                "status": "resolved" if healthy else "not_resolved",
-                "healthy": healthy,
-                "desired_replicas": desired,
-                "ready_replicas": ready_replicas,
-                "available_replicas": available,
-                "healthy_pods": healthy_pods,
-                "pods": pod_results,
-            }
-
-        except ApiException as exc:
-            return {
-                "status": "not_resolved",
-                "healthy": False,
-                "message": (
-                    f"Kubernetes verification failed: {exc}"
-                ),
-            }

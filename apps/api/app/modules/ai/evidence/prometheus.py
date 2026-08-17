@@ -14,7 +14,7 @@ class PrometheusEvidenceProvider(EvidenceProvider):
     def __init__(self, kubeconfig: str) -> None:
         self.metrics_service = MetricsService(
             kubeconfig
-    )
+        )
 
     async def collect(
         self,
@@ -61,8 +61,7 @@ class PrometheusEvidenceProvider(EvidenceProvider):
             return {}
 
         return {
-            
-           "prometheus": collected,
+            "prometheus": collected,
         }
     
     def _build_queries(

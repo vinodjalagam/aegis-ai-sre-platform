@@ -108,8 +108,8 @@ class IncidentService:
         incident,
     ):
         """
-        Automatically resolve an incident when
-        the Prometheus rule is no longer triggered.
+        Automatically resolve an incident after
+        successful remediation verification.
         """
 
         resolved = await self.repository.resolve(
@@ -121,7 +121,10 @@ class IncidentService:
             data=IncidentTimelineEventCreate(
                 event_type="resolved",
                 title="Incident resolved",
-                description="Incident automatically resolved because the rule is no longer triggered",
+                description=(
+                    "Incident automatically resolved after "
+                    "successful remediation and verification."
+                ),
             ),
         )
 

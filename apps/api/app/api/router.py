@@ -9,6 +9,9 @@ from app.modules.kubernetes.api import router as kubernetes_router
 from app.modules.discovery.api import router as discovery_router
 from app.modules.metrics.api import router as metrics_router
 from app.modules.incidents.api import router as incidents_router
+from app.modules.incidents.remediation.api import (
+    router as remediation_router,
+)
 from app.core.config import settings
 from app.modules.incidents.evidence.api import (
     router as incident_evidence_router,
@@ -34,3 +37,4 @@ api_router.include_router(incident_evidence_router)
 api_router.include_router(incident_timeline_router)
 api_router.include_router(rca_router)
 api_router.include_router(incident_comments_router)
+api_router.include_router(remediation_router)

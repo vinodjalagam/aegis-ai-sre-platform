@@ -1,0 +1,101 @@
+.kubernetes-resource-page {
+  padding: 32px;
+}
+
+.resource-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 28px;
+}
+
+.back-button,
+.refresh-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 13px;
+  color: #9aaabd;
+  background: #0e151e;
+  border: 1px solid #202b38;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.back-button:hover,
+.refresh-button:hover {
+  color: #dce5ee;
+  background: #141f2b;
+  border-color: #314255;
+}
+
+.resource-page-title {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 25px;
+}
+
+.resource-page-icon {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  color: #8da5bf;
+  background: #182433;
+  border: 1px solid #293a4d;
+  border-radius: 9px;
+}
+
+.resource-page-title h1 {
+  margin: 3px 0 5px;
+  color: #edf2f7;
+  font-size: 26px;
+}
+
+.resource-page-title p:last-child {
+  margin: 0;
+  color: #617184;
+  font-size: 11px;
+}
+
+.resource-page-panel {
+  min-height: 420px;
+  padding: 20px;
+  background: #0e151e;
+  border: 1px solid #202b38;
+  border-radius: 10px;
+}
+
+.resource-page-empty {
+  min-height: 380px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: #526477;
+}
+
+.resource-page-empty svg {
+  margin-bottom: 15px;
+}
+
+.resource-page-empty h2 {
+  margin: 0 0 7px;
+  color: #cbd5df;
+  font-size: 17px;
+}
+
+.resource-page-empty p {
+  margin: 0;
+  color: #657589;
+  font-size: 11px;
+}
+
+.resource-page-empty small {
+  margin-top: 12px;
+  color: #46576a;
+  font-size: 10px;
+}

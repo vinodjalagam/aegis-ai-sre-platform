@@ -98,3 +98,63 @@ class DaemonSetResponse(BaseModel):
     namespace: str
     desired: int | None = None
     ready: int | None = None
+    
+class ResourceManifestResponse(BaseModel):
+    """
+    Kubernetes resource manifest response.
+    """
+
+    resource_type: str
+    name: str
+    namespace: str
+    manifest: dict
+
+class ResourceYamlResponse(BaseModel):
+    """
+    Kubernetes resource YAML response.
+    """
+
+    resource_type: str
+    name: str
+    namespace: str
+    yaml: str
+    
+class ResourceApplyRequest(BaseModel):
+    yaml: str
+    
+    
+class ResourceValidateRequest(BaseModel):
+    yaml: str
+
+
+class ResourceValidateResponse(BaseModel):
+    valid: bool
+    resource_type: str | None = None
+    name: str | None = None
+    namespace: str | None = None
+    message: str
+    
+class ResourceDiffRequest(BaseModel):
+    yaml: str
+
+
+class ResourceDiffResponse(BaseModel):
+    changed: bool
+    diff: str
+    message: str
+    
+class ResourceApplyRequest(BaseModel):
+    yaml: str
+
+class ResourceApplyResponse(BaseModel):
+    """
+    Kubernetes resource apply response.
+    """
+
+    applied: bool
+    resource_type: str
+    name: str
+    namespace: str
+    message: str
+    rollout: dict | None = None
+    verification: dict | None = None

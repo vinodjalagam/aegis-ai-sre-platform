@@ -1,0 +1,160 @@
+.kubernetes-page {
+  padding: 32px;
+}
+
+.kubernetes-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 25px;
+}
+
+.kubernetes-header h1 {
+  margin: 0;
+  font-size: 26px;
+  color: #edf2f7;
+}
+
+.cluster-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: #0e151e;
+  border: 1px solid #202b38;
+  border-radius: 8px;
+}
+
+.cluster-status strong,
+.cluster-status span {
+  display: block;
+}
+
+.cluster-status strong {
+  color: #cbd5e1;
+  font-size: 12px;
+}
+
+.cluster-status span:not(.status-dot) {
+  margin-top: 3px;
+  color: #617184;
+  font-size: 10px;
+}
+
+.kubernetes-summary {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.kube-stat {
+  padding: 17px;
+  background: #0e151e;
+  border: 1px solid #202b38;
+  border-radius: 9px;
+}
+
+.kube-stat span,
+.kube-stat small {
+  display: block;
+}
+
+.kube-stat span {
+  color: #718196;
+  font-size: 10px;
+}
+
+.kube-stat strong {
+  display: block;
+  margin: 9px 0 4px;
+  color: #dce5ee;
+  font-size: 22px;
+}
+
+.kube-stat small {
+  color: #536376;
+  font-size: 9px;
+}
+
+.resource-section {
+  padding: 20px;
+  background: #0e151e;
+  border: 1px solid #202b38;
+  border-radius: 10px;
+}
+
+.section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  color: #66768a;
+}
+
+.section-heading h2 {
+  margin: 0;
+  color: #dce4ec;
+  font-size: 14px;
+}
+
+.section-heading p {
+  margin: 5px 0 0;
+  color: #59697b;
+  font-size: 10px;
+}
+
+.resource-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.resource-card {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  min-height: 76px;
+  padding: 14px;
+  text-align: left;
+  color: inherit;
+  background: #101821;
+  border: 1px solid #1d2936;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: 0.15s ease;
+}
+
+.resource-card:hover {
+  background: #141f2b;
+  border-color: #314255;
+  transform: translateY(-1px);
+}
+
+.resource-icon {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  color: #829ab4;
+  background: #182433;
+  border: 1px solid #293a4d;
+  border-radius: 8px;
+}
+
+.resource-content strong,
+.resource-content span {
+  display: block;
+}
+
+.resource-content strong {
+  color: #cbd5df;
+  font-size: 12px;
+}
+
+.resource-content span {
+  margin-top: 4px;
+  color: #58697b;
+  font-size: 9px;
+}
